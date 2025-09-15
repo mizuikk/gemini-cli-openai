@@ -173,7 +173,7 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 			// Streaming response
 			const { readable, writable } = new TransformStream();
 			const writer = writable.getWriter();
-			const openAITransformer = createOpenAIStreamTransformer(model);
+			const openAITransformer = createOpenAIStreamTransformer(model, c.env.REASONING_OUTPUT_MODE || "tagged");
 			const openAIStream = readable.pipeThrough(openAITransformer);
 
 			// Asynchronously pipe data from Gemini to transformer
@@ -242,6 +242,10 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 							message: {
 								role: "assistant",
 								content: completion.content,
+								// DeepSeek R1 mode: include reasoning_content in final message
+								...(c.env.REASONING_OUTPUT_MODE?.toLowerCase() === "r1" && completion.reasoning_content
+									? { reasoning_content: completion.reasoning_content }
+									: {}),
 								tool_calls: completion.tool_calls
 							},
 							finish_reason: completion.tool_calls && completion.tool_calls.length > 0 ? "tool_calls" : "stop"
@@ -255,6 +259,14 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 						prompt_tokens: completion.usage.inputTokens,
 						completion_tokens: completion.usage.outputTokens,
 						total_tokens: completion.usage.inputTokens + completion.usage.outputTokens
+					};
+				}
+
+				// DeepSeek R1 compatibility: include completion_tokens_details at top-level
+				if ((c.env.REASONING_OUTPUT_MODE || "").toLowerCase() === "r1") {
+					// Attach a minimal structure; exact counts are optional and model-dependent
+					(response as unknown as Record<string, unknown>).completion_tokens_details = {
+						reasoning_tokens: 0
 					};
 				}
 

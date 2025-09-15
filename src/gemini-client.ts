@@ -789,12 +789,14 @@ export class GeminiApiClient {
 		} & NativeToolsRequestParams
 	): Promise<{
 		content: string;
+		reasoning_content?: string;
 		usage?: UsageData;
 		tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
 	}> {
 		try {
 			let content = "";
 			let usage: UsageData | undefined;
+			let reasoning_content = "";
 			const tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> = [];
 
 			// Collect all chunks from the stream
@@ -803,6 +805,13 @@ export class GeminiApiClient {
 					content += chunk.data;
 				} else if (chunk.type === "usage" && typeof chunk.data === "object") {
 					usage = chunk.data as UsageData;
+				} else if (chunk.type === "real_thinking" && typeof chunk.data === "string") {
+					reasoning_content += chunk.data;
+				} else if (chunk.type === "reasoning") {
+					const rd = chunk.data as ReasoningData;
+					if (rd && typeof rd.reasoning === "string") {
+						reasoning_content += rd.reasoning;
+					}
 				} else if (chunk.type === "tool_code" && typeof chunk.data === "object") {
 					const toolData = chunk.data as GeminiFunctionCall;
 					tool_calls.push({
@@ -819,6 +828,7 @@ export class GeminiApiClient {
 
 			return {
 				content,
+				reasoning_content: reasoning_content ? reasoning_content : undefined,
 				usage,
 				tool_calls: tool_calls.length > 0 ? tool_calls : undefined
 			};

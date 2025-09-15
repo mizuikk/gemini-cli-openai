@@ -168,7 +168,7 @@ npm run dev
 |----------|-------------|
 | `ENABLE_FAKE_THINKING` | Enable synthetic thinking output for testing (set to `"true"`). |
 | `ENABLE_REAL_THINKING` | Enable real Gemini thinking output (set to `"true"`). |
-| `REASONING_OUTPUT_MODE` | Reasoning presentation: `tagged` (inline `<think>`), `field` (delta.reasoning), or `hidden` (suppress). |
+| `REASONING_OUTPUT_MODE` | Reasoning presentation: `tagged` (inline `<think>`), `field` (delta.reasoning), `hidden` (suppress), or `r1` (DeepSeek Reasoner-compatible: stream `delta.reasoning_content`; non-stream returns `message.reasoning_content`). |
 
 #### Model & Feature Flags
 
@@ -207,6 +207,7 @@ npm run dev
 - You can control the reasoning token budget with the `thinking_budget` parameter.
 - By default, reasoning output is streamed as `reasoning` chunks in the OpenAI-compatible response format.
 - When `REASONING_OUTPUT_MODE=tagged`, reasoning is streamed inline wrapped in `<think></think>` tags (Dify Tagged style).
+- When `REASONING_OUTPUT_MODE=r1`, streamed reasoning appears in `choices[0].delta.reasoning_content` and non-streaming responses include `choices[0].message.reasoning_content`, matching DeepSeek Reasoner specs.
 - **Optimized UX**: The `</think>` tag is only sent when the actual LLM response begins, eliminating awkward pauses between thinking and response.
 - If neither thinking mode is enabled, thinking models will behave like regular models.
 
@@ -296,7 +297,62 @@ for chunk in response:
         print(chunk.choices[0].delta.content, end="")
 ```
 
-**Pro Tip**: Set `REASONING_OUTPUT_MODE=tagged` to stream reasoning as content with `<think>` tags (Dify Tagged style). Use `hidden` to suppress thought content and only return the final answer.
+**Pro Tip**: Set `REASONING_OUTPUT_MODE=tagged` to stream reasoning as content with `<think>` tags (Dify Tagged style). Use `hidden` to suppress thought content and only return the final answer. Set `r1` to emit DeepSeek-compatible `reasoning_content` fields.
+
+### DeepSeek R1 Mode
+
+When you set `REASONING_OUTPUT_MODE=r1`, the worker emits DeepSeek Reasoner-compatible fields:
+
+- Streaming chunks (`object: "chat.completion.chunk"`):
+  - Reasoning appears as `choices[0].delta.reasoning_content`.
+  - The first emitted content includes `delta.role: "assistant"`.
+  - The terminal event has `choices[0].delta: {}` with a `finish_reason` (e.g., `stop`, `tool_calls`).
+- Non-streaming (`object: "chat.completion"`):
+  - Final message includes both `message.content` and `message.reasoning_content`.
+- Compatibility:
+  - Tool calls (`tool_calls`) and usage fields remain unchanged.
+  - A minimal `completion_tokens_details` object is included for schema compatibility.
+
+Example (streaming chunk):
+```json
+{
+  "id": "chatcmpl-123",
+  "object": "chat.completion.chunk",
+  "created": 1708976947,
+  "model": "gemini-2.5-pro",
+  "choices": [
+    {
+      "index": 0,
+      "delta": {
+        "role": "assistant",
+        "reasoning_content": "Let’s decompose the problem…"
+      },
+      "finish_reason": null
+    }
+  ]
+}
+```
+
+Example (final non-streaming response):
+```json
+{
+  "id": "chatcmpl-xyz",
+  "object": "chat.completion",
+  "created": 1730000000,
+  "model": "gemini-2.5-pro",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Final answer here.",
+        "reasoning_content": "Step-by-step reasoning…"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}
+```
 
 ### OpenAI SDK (Python)
 ```python

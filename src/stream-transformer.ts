@@ -86,7 +86,10 @@ function isNativeToolResponse(data: unknown): data is NativeToolResponse {
  * Creates a TransformStream to convert Gemini's output chunks
  * into OpenAI-compatible server-sent events.
  */
-export function createOpenAIStreamTransformer(model: string): TransformStream<StreamChunk, Uint8Array> {
+export function createOpenAIStreamTransformer(
+    model: string,
+    outputMode: string = "tagged"
+): TransformStream<StreamChunk, Uint8Array> {
 	const chatID = `chatcmpl-${crypto.randomUUID()}`;
 	const creationTime = Math.floor(Date.now() / 1000);
 	const encoder = new TextEncoder();
@@ -95,39 +98,53 @@ export function createOpenAIStreamTransformer(model: string): TransformStream<St
 	let toolCallName: string | null = null;
 	let usageData: UsageData | undefined;
 
-	return new TransformStream({
+    const mode = (outputMode || "tagged").toLowerCase();
+    const isR1 = mode === "r1"; // DeepSeek Reasoner-compatible stream
+
+    return new TransformStream({
 		transform(chunk, controller) {
 			const delta: OpenAIDelta = {};
 			let openAIChunk: OpenAIChunk | null = null;
 
-			switch (chunk.type) {
-				case "text":
-				case "thinking_content":
-					if (typeof chunk.data === "string") {
-						delta.content = chunk.data;
-						if (firstChunk) {
-							delta.role = "assistant";
-							firstChunk = false;
-						}
-					}
-					break;
-				case "real_thinking":
-					if (typeof chunk.data === "string") {
-						delta.reasoning = chunk.data;
-					}
-					break;
-				case "reasoning":
-					if (isReasoningData(chunk.data)) {
-						delta.reasoning = chunk.data.reasoning;
-					}
-					break;
-				case "reasoning_end":
-					if (isReasoningEndData(chunk.data)) {
-						delta.reasoning_finished = chunk.data.finished;
-					}
-					break;
-				case "tool_code":
-					if (isGeminiFunctionCall(chunk.data)) {
+            switch (chunk.type) {
+                case "text":
+                case "thinking_content":
+                    if (typeof chunk.data === "string") {
+                        delta.content = chunk.data;
+                        if (firstChunk) {
+                            delta.role = "assistant";
+                            firstChunk = false;
+                        }
+                    }
+                    break;
+                case "real_thinking":
+                    if (typeof chunk.data === "string") {
+                        if (isR1) {
+                            // DeepSeek R1 spec: use delta.reasoning_content
+                            delta.reasoning_content = chunk.data;
+                        } else {
+                            // Default custom field for non-R1 modes
+                            delta.reasoning = chunk.data;
+                        }
+                    }
+                    break;
+                case "reasoning":
+                    if (isReasoningData(chunk.data)) {
+                        if (isR1) {
+                            delta.reasoning_content = chunk.data.reasoning;
+                        } else {
+                            delta.reasoning = chunk.data.reasoning;
+                        }
+                    }
+                    break;
+                case "reasoning_end":
+                    // DeepSeek chunks do not send a reasoning_finished flag; omit in R1 mode
+                    if (!isR1 && isReasoningEndData(chunk.data)) {
+                        delta.reasoning_finished = chunk.data.finished;
+                    }
+                    break;
+                case "tool_code":
+                    if (isGeminiFunctionCall(chunk.data)) {
 						const toolData = chunk.data;
 						toolCallName = toolData.name;
 						toolCallId = `call_${crypto.randomUUID()}`;
@@ -186,26 +203,37 @@ export function createOpenAIStreamTransformer(model: string): TransformStream<St
 				controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAIChunk)}\n\n`));
 			}
 		},
-		flush(controller) {
-			const finishReason = toolCallId ? "tool_calls" : "stop";
-			const finalChunk: OpenAIFinalChunk = {
-				id: chatID,
-				object: OPENAI_CHAT_COMPLETION_OBJECT,
-				created: creationTime,
-				model: model,
-				choices: [{ index: 0, delta: {}, finish_reason: finishReason }]
-			};
+        flush(controller) {
+            const finishReason = toolCallId ? "tool_calls" : "stop";
+            const finalChunk: OpenAIFinalChunk = {
+                id: chatID,
+                object: OPENAI_CHAT_COMPLETION_OBJECT,
+                created: creationTime,
+                model: model,
+                choices: [{ index: 0, delta: {}, finish_reason: finishReason }]
+            };
 
-			if (usageData) {
-				finalChunk.usage = {
-					prompt_tokens: usageData.inputTokens,
-					completion_tokens: usageData.outputTokens,
-					total_tokens: usageData.inputTokens + usageData.outputTokens
-				};
-			}
+            if (usageData) {
+                finalChunk.usage = {
+                    prompt_tokens: usageData.inputTokens,
+                    completion_tokens: usageData.outputTokens,
+                    total_tokens: usageData.inputTokens + usageData.outputTokens
+                };
+            }
 
-			controller.enqueue(encoder.encode(`data: ${JSON.stringify(finalChunk)}\n\n`));
-			controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-		}
-	});
+            // In R1 mode, DeepSeek also returns completion_tokens_details on responses;
+            // for stream chunks we append the same object fields to the final event payload.
+            const payload: Record<string, unknown> = { ...finalChunk } as Record<string, unknown>;
+            if (isR1) {
+                (payload as any).completion_tokens_details = {
+                    // Without tokenizer we can only provide a conservative placeholder
+                    // to match the field shape; downstream can ignore if unused.
+                    reasoning_tokens: 0
+                };
+            }
+
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        }
+    });
 }

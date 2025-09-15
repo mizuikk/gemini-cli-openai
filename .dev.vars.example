@@ -19,10 +19,12 @@ GCP_SERVICE_ACCOUNT={"access_token":"ya29...","refresh_token":"1//...","scope":"
 # Thinking modes (choose based on your needs)
 # ENABLE_FAKE_THINKING=true           # Streams synthetic reasoning for demos/tests
 # ENABLE_REAL_THINKING=true           # Enables Gemini native reasoning output
-# REASONING_OUTPUT_MODE=tagged        # tagged | field | hidden
+# REASONING_OUTPUT_MODE=tagged        # tagged | field | hidden | r1
 #   - tagged: inline <think>...</think> in content (DeepSeek/Dify style)
 #   - field:  send reasoning in delta.reasoning (no tags in content)
 #   - hidden: suppress reasoning entirely, return only final content
+#   - r1:     DeepSeek Reasoner compatible mode. Streams reasoning via `delta.reasoning_content`,
+#             and includes `message.reasoning_content` in the final response; JSON shape aligns with DeepSeek `/chat/completions`.
 
 # Auto model switching (pro -> flash on 429/503)
 # ENABLE_AUTO_MODEL_SWITCHING=true

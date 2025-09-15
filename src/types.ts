@@ -164,9 +164,11 @@ export interface ChatCompletionChoice {
 }
 
 export interface ChatCompletionMessage {
-	role: "assistant";
-	content: string | null;
-	tool_calls?: ToolCall[];
+    role: "assistant";
+    content: string | null;
+    // DeepSeek Reasoner compatibility (r1 mode)
+    reasoning_content?: string | null;
+    tool_calls?: ToolCall[];
 }
 
 export interface ChatCompletionUsage {
