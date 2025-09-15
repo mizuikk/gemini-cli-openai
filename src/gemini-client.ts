@@ -2,6 +2,7 @@ import {
 	Env,
 	StreamChunk,
 	ReasoningData,
+	ReasoningEndData,
 	UsageData,
 	ChatMessage,
 	MessageContent,
@@ -599,6 +600,7 @@ export class GeminiApiClient {
 
 		let hasClosedThinking = false;
 		let hasStartedThinking = false;
+		let hasSentRealThinking = false;
 
 		for await (const jsonData of this.parseSSEStream(response.body)) {
 			const candidate = jsonData.response?.candidates?.[0];
@@ -633,6 +635,7 @@ export class GeminiApiClient {
 								type: "real_thinking",
 								data: thinkingText
 							};
+							hasSentRealThinking = true;
 						}
 					}
 					// Check if text content contains <think> tags (based on your original example)
@@ -682,6 +685,7 @@ export class GeminiApiClient {
 										type: "real_thinking",
 										data: thinkingMatch[1]
 									};
+									hasSentRealThinking = true;
 								}
 							}
 
@@ -748,6 +752,14 @@ export class GeminiApiClient {
 					data: usageData
 				};
 			}
+		}
+		
+		// Send reasoning end signal for field mode if real thinking was sent
+		if (hasSentRealThinking && !realThinkingAsContent && !hideThinkingByEnv) {
+			yield {
+				type: "reasoning_end",
+				data: { finished: true }
+			};
 		}
 	}
 

@@ -1,4 +1,4 @@
-import { StreamChunk, ReasoningData, GeminiFunctionCall, UsageData } from "./types";
+import { StreamChunk, ReasoningData, ReasoningEndData, GeminiFunctionCall, UsageData } from "./types";
 import { NativeToolResponse } from "./types/native-tools";
 import { OPENAI_CHAT_COMPLETION_OBJECT } from "./config";
 
@@ -26,6 +26,7 @@ interface OpenAIDelta {
 	content?: string | null;
 	reasoning?: string;
 	reasoning_content?: string | null;
+	reasoning_finished?: boolean;
 	tool_calls?: OpenAIToolCall[];
 	native_tool_calls?: NativeToolResponse[];
 	grounding?: unknown;
@@ -64,6 +65,10 @@ interface OpenAIFinalChunk {
 // Type guard functions
 function isReasoningData(data: unknown): data is ReasoningData {
 	return typeof data === "object" && data !== null && ("reasoning" in data || "toolCode" in data);
+}
+
+function isReasoningEndData(data: unknown): data is ReasoningEndData {
+	return typeof data === "object" && data !== null && "finished" in data;
 }
 
 function isGeminiFunctionCall(data: unknown): data is GeminiFunctionCall {
@@ -114,6 +119,11 @@ export function createOpenAIStreamTransformer(model: string): TransformStream<St
 				case "reasoning":
 					if (isReasoningData(chunk.data)) {
 						delta.reasoning = chunk.data.reasoning;
+					}
+					break;
+				case "reasoning_end":
+					if (isReasoningEndData(chunk.data)) {
+						delta.reasoning_finished = chunk.data.finished;
 					}
 					break;
 				case "tool_code":

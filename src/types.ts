@@ -192,6 +192,10 @@ export interface ReasoningData {
 	toolCode?: string;
 }
 
+export interface ReasoningEndData {
+	finished: boolean;
+}
+
 // --- Stream Chunk Types ---
 export interface StreamChunk {
 	type:
@@ -200,8 +204,9 @@ export interface StreamChunk {
 		| "reasoning"
 		| "thinking_content"
 		| "real_thinking"
+		| "reasoning_end"
 		| "tool_code"
 		| "native_tool"
 		| "grounding_metadata";
-	data: string | UsageData | ReasoningData | GeminiFunctionCall | NativeToolResponse;
+	data: string | UsageData | ReasoningData | ReasoningEndData | GeminiFunctionCall | NativeToolResponse;
 }
