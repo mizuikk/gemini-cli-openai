@@ -44,7 +44,7 @@ Transform Google's Gemini models into OpenAI-compatible endpoints using Cloudfla
   - `medium`: Sets `thinking_budget = 12288` for flash models, `16384` for other models.
   - `high`: Sets `thinking_budget = 24576` for flash models, `32768` for other models.
 > 
-> Set `STREAM_THINKING_AS_CONTENT=true` to stream reasoning as content with `<thinking>` tags (DeepSeek R1 style) instead of using the reasoning field.
+> Set `STREAM_THINKING_AS_CONTENT=true` to stream reasoning as content with `<think>` tags (Dify Tagged style) instead of using the reasoning field.
 
 ## �🛠️ Setup
 
@@ -168,7 +168,7 @@ npm run dev
 |----------|-------------|
 | `ENABLE_FAKE_THINKING` | Enable synthetic thinking output for testing (set to `"true"`). |
 | `ENABLE_REAL_THINKING` | Enable real Gemini thinking output (set to `"true"`). |
-| `STREAM_THINKING_AS_CONTENT` | Stream thinking as content with `<thinking>` tags (DeepSeek R1 style). |
+| `STREAM_THINKING_AS_CONTENT` | Stream thinking as content with `<think>` tags (Dify Tagged style). |
 
 #### Model & Feature Flags
 
@@ -206,8 +206,8 @@ npm run dev
 - Real thinking provides genuine reasoning from Gemini and requires thinking-capable models (like Gemini 2.5 Pro/Flash).
 - You can control the reasoning token budget with the `thinking_budget` parameter.
 - By default, reasoning output is streamed as `reasoning` chunks in the OpenAI-compatible response format.
-- When `STREAM_THINKING_AS_CONTENT` is also set to `"true"`, reasoning will be streamed as regular content wrapped in `<thinking></thinking>` tags (DeepSeek R1 style).
-- **Optimized UX**: The `</thinking>` tag is only sent when the actual LLM response begins, eliminating awkward pauses between thinking and response.
+- When `STREAM_THINKING_AS_CONTENT` is also set to `"true"`, reasoning will be streamed as regular content wrapped in `<think></think>` tags (Dify Tagged style).
+- **Optimized UX**: The `</think>` tag is only sent when the actual LLM response begins, eliminating awkward pauses between thinking and response.
 - If neither thinking mode is enabled, thinking models will behave like regular models.
 
 **Auto Model Switching:**
@@ -296,7 +296,7 @@ for chunk in response:
         print(chunk.choices[0].delta.content, end="")
 ```
 
-**Pro Tip**: Set `STREAM_THINKING_AS_CONTENT=true` for optimal LiteLLM compatibility. The `<thinking>` tags format works better with LiteLLM's parsing and various downstream tools.
+**Pro Tip**: Set `STREAM_THINKING_AS_CONTENT=true` for optimal LiteLLM and Dify compatibility. The `<think>` tags format works better with downstream parsers.
 
 ### OpenAI SDK (Python)
 ```python
@@ -402,7 +402,50 @@ while (true) {
   if (done) break;
   
   const chunk = decoder.decode(value);
-  const lines = chunk.split('\n');
+  const lines = chunk.split('\### Dify Compatibility: Reasoning Format
+
+This worker supports Dify''s Tagged/Separated reasoning formats via a single request parameter and standardized `<think>...</think>` tags.
+
+- Reasoning format: set `reasoning_format` to `"tagged"` or `"separated"` in the root body, or under `extra_body` / `model_params`.
+- Default behavior when present: both `tagged` and `separated` cause the server to inline reasoning as `<think>` blocks in `delta.content`. Dify clients decide how to render:
+  - `tagged`: keep and display the `<think>` block.
+  - `separated`: strip the `<think>` block and show clean text; the thinking content is displayed separately by the client.
+- If `reasoning_format` is not provided, behavior falls back to environment:
+  - `STREAM_THINKING_AS_CONTENT=true` → inline `<think>` blocks in `delta.content`.
+  - Otherwise → reasoning appears in `delta.reasoning` (separate field).
+
+Example (streaming, Tagged):
+```jsonc
+{
+  "model": "gemini-2.5-pro",
+  "messages": [
+    { "role": "user", "content": "Solve 12 * 27 step by step." }
+  ],
+  "stream": true,
+  "reasoning_format": "tagged"
+}
+```
+SSE will begin with `delta.content` that starts a `<think>` block, followed by thought chunks, then a closing `</think>` before the first normal content.
+
+Example (streaming, Separated):
+```jsonc
+{
+  "model": "gemini-2.5-pro",
+  "messages": [ { "role": "user", "content": "Design a solution..." } ],
+  "stream": true,
+  "reasoning_format": "separated"
+}
+```
+Server still emits `<think>` blocks in `delta.content`. Dify''s Separated mode will strip them and present the reasoning separately. For custom clients, you can remove the block via:
+```js
+const display = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+```
+
+Notes:
+- Non-streaming responses do not include reasoning chunks; only final content (and optional usage) is returned.
+- The project migrated from `<think>` to `<think>` tags for Dify compatibility. Update any custom regex accordingly.
+- You may also control the depth via `reasoning_effort` (`none|low|medium|high`) or explicit `thinking_budget`.
+```n');
   
   for (const line of lines) {
     if (line.startsWith('data: ') && line !== 'data: [DONE]') {
@@ -780,3 +823,7 @@ Any other form of distribution, sublicensing, or commercial use is strictly proh
 
 
 [![Star History Chart](https://api.star-history.com/svg?repos=GewoonJaap/gemini-cli-openai&type=Date)](https://www.star-history.com/#GewoonJaap/gemini-cli-openai&Date)
+
+
+
+

@@ -16,7 +16,7 @@ export interface Env {
 	OPENAI_API_KEY?: string; // Optional API key for authentication
 	ENABLE_FAKE_THINKING?: string; // Optional flag to enable fake thinking output (set to "true" to enable)
 	ENABLE_REAL_THINKING?: string; // Optional flag to enable real Gemini thinking output (set to "true" to enable)
-	STREAM_THINKING_AS_CONTENT?: string; // Optional flag to stream thinking as content with <thinking> tags (set to "true" to enable)
+    STREAM_THINKING_AS_CONTENT?: string; // Optional flag to stream thinking as content with <think> tags (set to "true" to enable)
 	ENABLE_AUTO_MODEL_SWITCHING?: string; // Optional flag to enable automatic fallback from pro to flash on 429 errors (set to "true" to enable)
 	GEMINI_MODERATION_HARASSMENT_THRESHOLD?: SafetyThreshold;
 	GEMINI_MODERATION_HATE_SPEECH_THRESHOLD?: SafetyThreshold;
@@ -61,6 +61,7 @@ export interface ModelInfo {
 
 // --- Chat Completion Request Interface ---
 export type EffortLevel = "none" | "low" | "medium" | "high";
+export type ReasoningFormat = "tagged" | "separated";
 
 export interface Tool {
 	type: "function";
@@ -74,28 +75,31 @@ export interface Tool {
 export type ToolChoice = "none" | "auto" | { type: "function"; function: { name: string } };
 
 export interface ChatCompletionRequest {
-	model: string;
-	messages: ChatMessage[];
-	stream?: boolean;
-	thinking_budget?: number; // Optional thinking token budget
-	reasoning_effort?: EffortLevel; // Optional effort level for thinking
-	tools?: Tool[];
-	tool_choice?: ToolChoice;
-	// Support for common custom parameter locations
-	extra_body?: {
-		reasoning_effort?: EffortLevel;
-		enable_search?: boolean;
-		enable_url_context?: boolean;
-		enable_native_tools?: boolean;
-		native_tools_priority?: "native" | "custom" | "mixed";
-	};
-	model_params?: {
-		reasoning_effort?: EffortLevel;
-		enable_search?: boolean;
-		enable_url_context?: boolean;
-		enable_native_tools?: boolean;
-		native_tools_priority?: "native" | "custom" | "mixed";
-	};
+    model: string;
+    messages: ChatMessage[];
+    stream?: boolean;
+    thinking_budget?: number; // Optional thinking token budget
+    reasoning_effort?: EffortLevel; // Optional effort level for thinking
+    reasoning_format?: ReasoningFormat; // Dify-compatible: 'tagged' (default) or 'separated'
+    tools?: Tool[];
+    tool_choice?: ToolChoice;
+    // Support for common custom parameter locations
+    extra_body?: {
+        reasoning_effort?: EffortLevel;
+        reasoning_format?: ReasoningFormat;
+        enable_search?: boolean;
+        enable_url_context?: boolean;
+        enable_native_tools?: boolean;
+        native_tools_priority?: "native" | "custom" | "mixed";
+    };
+    model_params?: {
+        reasoning_effort?: EffortLevel;
+        reasoning_format?: ReasoningFormat;
+        enable_search?: boolean;
+        enable_url_context?: boolean;
+        enable_native_tools?: boolean;
+        native_tools_priority?: "native" | "custom" | "mixed";
+    };
 	// Newly added OpenAI parameters
 	max_tokens?: number;
 	temperature?: number;

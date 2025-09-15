@@ -317,6 +317,7 @@ export class GeminiApiClient {
 			response_format?: {
 				type: "text" | "json_object";
 			};
+			reasoning_format?: "tagged" | "separated";
 		} & NativeToolsRequestParams
 	): AsyncGenerator<StreamChunk> {
 		await this.authManager.initializeAuth();
@@ -332,7 +333,11 @@ export class GeminiApiClient {
 		const isThinkingModel = geminiCliModels[modelId]?.thinking || false;
 		const isRealThinkingEnabled = this.env.ENABLE_REAL_THINKING === "true";
 		const isFakeThinkingEnabled = this.env.ENABLE_FAKE_THINKING === "true";
-		const streamThinkingAsContent = this.env.STREAM_THINKING_AS_CONTENT === "true";
+		const streamThinkingAsContent =
+			options?.reasoning_format
+				? // For Dify both 'tagged' and 'separated' rely on <think> blocks in content
+				  (options.reasoning_format === "tagged" || options.reasoning_format === "separated")
+				: this.env.STREAM_THINKING_AS_CONTENT === "true";
 		const includeReasoning = options?.includeReasoning || false;
 
 		const req = {
@@ -437,10 +442,10 @@ export class GeminiApiClient {
 		const requestPreview = userContent.substring(0, 100) + (userContent.length > 100 ? "..." : "");
 
 		if (streamAsContent) {
-			// DeepSeek R1 style: stream thinking as content with <thinking> tags
+			// DeepSeek / Dify Tagged style: stream thinking as content with <think> tags
 			yield {
 				type: "thinking_content",
-				data: "<thinking>\n"
+				data: "<think>\n"
 			};
 
 			// Add a small delay after opening tag
@@ -487,7 +492,7 @@ export class GeminiApiClient {
 				await new Promise((resolve) => setTimeout(resolve, 50));
 			}
 
-			// Note: We don't close the thinking tag here - it will be closed when real content starts
+			// Note: We don't close the think tag here - it will be closed when real content starts
 		} else {
 			// Original mode: stream as reasoning field
 			const reasoningTexts = REASONING_MESSAGES.map((msg) => msg.replace("{requestPreview}", requestPreview));
@@ -596,15 +601,15 @@ export class GeminiApiClient {
 					if (part.thought === true && part.text) {
 						const thinkingText = part.text;
 
-						if (realThinkingAsContent) {
-							// Stream as content with <thinking> tags (DeepSeek R1 style)
-							if (!hasStartedThinking) {
-								yield {
-									type: "thinking_content",
-									data: "<thinking>\n"
-								};
-								hasStartedThinking = true;
-							}
+					if (realThinkingAsContent) {
+						// Stream as content with <think> tags (Dify Tagged)
+						if (!hasStartedThinking) {
+							yield {
+								type: "thinking_content",
+								data: "<think>\n"
+							};
+							hasStartedThinking = true;
+						}
 
 							yield {
 								type: "thinking_content",
@@ -627,7 +632,7 @@ export class GeminiApiClient {
 								if (!hasStartedThinking) {
 									yield {
 										type: "thinking_content",
-										data: "<thinking>\n"
+										data: "<think>\n"
 									};
 									hasStartedThinking = true;
 								}
@@ -644,7 +649,7 @@ export class GeminiApiClient {
 								if (hasStartedThinking && !hasClosedThinking) {
 									yield {
 										type: "thinking_content",
-										data: "\n</thinking>\n\n"
+										data: "\n</think>\n\n"
 									};
 									hasClosedThinking = true;
 								}
@@ -673,7 +678,7 @@ export class GeminiApiClient {
 						if ((needsThinkingClose || (realThinkingAsContent && hasStartedThinking)) && !hasClosedThinking) {
 							yield {
 								type: "thinking_content",
-								data: "\n</thinking>\n\n"
+								data: "\n</think>\n\n"
 							};
 							hasClosedThinking = true;
 						}
@@ -693,7 +698,7 @@ export class GeminiApiClient {
 						if ((needsThinkingClose || (realThinkingAsContent && hasStartedThinking)) && !hasClosedThinking) {
 							yield {
 								type: "thinking_content",
-								data: "\n</thinking>\n\n"
+								data: "\n</think>\n\n"
 							};
 							hasClosedThinking = true;
 						}
@@ -748,6 +753,7 @@ export class GeminiApiClient {
 			response_format?: {
 				type: "text" | "json_object";
 			};
+			reasoning_format?: "tagged" | "separated";
 		} & NativeToolsRequestParams
 	): Promise<{
 		content: string;

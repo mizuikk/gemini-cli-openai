@@ -49,6 +49,13 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 		let includeReasoning = isRealThinkingEnabled; // Automatically enable reasoning when real thinking is enabled
 		let thinkingBudget = body.thinking_budget ?? DEFAULT_THINKING_BUDGET; // Default to dynamic allocation
 
+		// Dify-compatible reasoning format: default to 'tagged'
+		const reasoning_format =
+			(body.reasoning_format || body.extra_body?.reasoning_format || body.model_params?.reasoning_format || "tagged") as
+				| "tagged"
+				| "separated";
+		const streamReasoningAsContent = reasoning_format === "tagged"; // tagged => inline <think> tags
+
 		// Newly added parameters
 		const generationOptions = {
 			max_tokens: body.max_tokens,
@@ -93,6 +100,7 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 			stream,
 			includeReasoning,
 			thinkingBudget,
+			reasoning_format,
 			tools,
 			tool_choice
 		});
@@ -178,6 +186,7 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 						thinkingBudget,
 						tools,
 						tool_choice,
+						reasoning_format,
 						...generationOptions
 					});
 
@@ -219,6 +228,7 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 					thinkingBudget,
 					tools,
 					tool_choice,
+					reasoning_format,
 					...generationOptions
 				});
 
