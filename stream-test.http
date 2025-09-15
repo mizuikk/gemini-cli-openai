@@ -32,7 +32,7 @@ Content-Type: application/json
 
 ###
 
-### Test streaming chat completion (without explicit stream parameter - should default to true)
+### Test streaming chat completion (without explicit stream parameter - should default to false)
 POST http://localhost:8787/v1/chat/completions
 Content-Type: application/json
 

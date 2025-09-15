@@ -1,71 +1,45 @@
-# Gemini CLI OpenAI Worker Environment Variables
+# Gemini CLI OpenAI Worker - Local Development Environment Variables (Example)
+#
+# Copy this file to `.dev.vars` and fill in your values.
+# Do NOT commit `.dev.vars` to version control. It contains secrets.
 
-# Required: OAuth2 credentials JSON from Gemini CLI authentication
-# Get this by running `gemini auth` and copying the contents of ~/.gemini/oauth_creds.json
-GCP_SERVICE_ACCOUNT={"access_token":"ya29.a0AS3H6Nx...","refresh_token":"1//09FtpJYpxOd...","scope":"https://www.googleapis.com/auth/cloud-platform ...","token_type":"Bearer","id_token":"eyJhbGciOiJSUzI1NiIs...","expiry_date":1750927763467}
+# Required: OAuth2 credentials JSON string from Gemini CLI authentication
+# Obtain by running `npm i -g @google/gemini-cli && gemini` and then copying
+# the contents of the credentials file (see README for exact path per OS).
+GCP_SERVICE_ACCOUNT={"access_token":"ya29...","refresh_token":"1//...","scope":"...","token_type":"Bearer","id_token":"eyJ...","expiry_date":1750000000000}
 
 # Optional: Google Cloud Project ID (auto-discovered if not set)
 # GEMINI_PROJECT_ID=your-project-id
 
 # Optional: API key for authentication (if not set, API is public)
-# When set, clients must include "Authorization: Bearer <your-api-key>" header
-# Example: sk-1234567890abcdef1234567890abcdef
-OPENAI_API_KEY=sk-your-secret-api-key-here
+# When set, clients must send: Authorization: Bearer <your-api-key>
+# Recommended format: sk-<random>
+# OPENAI_API_KEY=sk-your-secret-api-key-here
 
-# Optional: Enable fake thinking output for thinking models (set to "true" to enable)
-# When enabled, models marked with thinking: true will generate synthetic reasoning text
-# before providing their actual response, similar to OpenAI's o3 model behavior
-ENABLE_FAKE_THINKING=true
+# Thinking modes (choose based on your needs)
+# ENABLE_FAKE_THINKING=true           # Streams synthetic reasoning for demos/tests
+# ENABLE_REAL_THINKING=true           # Enables Gemini native reasoning output
+# STREAM_THINKING_AS_CONTENT=true     # Stream reasoning as <thinking> content
 
-# Optional: Enable real Gemini thinking output (set to "true" to enable)
-# When enabled, requests with include_reasoning=true will use Gemini's native thinking
-# This requires thinking-capable models and provides genuine reasoning from Gemini
-ENABLE_REAL_THINKING=true
+# Auto model switching (pro -> flash on 429/503)
+# ENABLE_AUTO_MODEL_SWITCHING=true
 
-# Optional: Stream thinking as content with <thinking> tags (DeepSeek R1 style)
-# When enabled along with either thinking mode, reasoning will be streamed as regular content
-# wrapped in <thinking></thinking> tags instead of using the reasoning field
-STREAM_THINKING_AS_CONTENT=true
+# Content safety thresholds (BLOCK_NONE|BLOCK_FEW|BLOCK_SOME|BLOCK_ONLY_HIGH|HARM_BLOCK_THRESHOLD_UNSPECIFIED)
+# GEMINI_MODERATION_HARASSMENT_THRESHOLD=BLOCK_SOME
+# GEMINI_MODERATION_HATE_SPEECH_THRESHOLD=BLOCK_SOME
+# GEMINI_MODERATION_SEXUALLY_EXPLICIT_THRESHOLD=BLOCK_SOME
+# GEMINI_MODERATION_DANGEROUS_CONTENT_THRESHOLD=BLOCK_ONLY_HIGH
 
-# Optional: Auto switch from Pro to flash when you are getting rate-limited
-ENABLE_AUTO_MODEL_SWITCHING=true
-
-# Optional: Gemini Moderation Settings
-# Configure content safety thresholds. Valid values: BLOCK_NONE, BLOCK_FEW, BLOCK_SOME, BLOCK_ONLY_HIGH, HARM_BLOCK_THRESHOLD_UNSPECIFIED
-# Example: BLOCK_NONE will disable blocking for that category.
-# GEMINI_MODERATION_HARASSMENT_THRESHOLD=BLOCK_NONE
-# GEMINI_MODERATION_HATE_SPEECH_THRESHOLD=BLOCK_NONE
-# GEMINI_MODERATION_SEXUALLY_EXPLICIT_THRESHOLD=BLOCK_NONE
-# GEMINI_MODERATION_DANGEROUS_CONTENT_THRESHOLD=BLOCK_NONE
-
-# --- Native Tools Configuration ---
-
-# Optional: Master switch to enable or disable all native Gemini tools (default: false)
+# Native tools (experimental)
 # ENABLE_GEMINI_NATIVE_TOOLS=true
-
-# Optional: Enable specific native tools (default: false)
 # ENABLE_GOOGLE_SEARCH=true
 # ENABLE_URL_CONTEXT=true
-
-# Optional: Tool priority strategy (native_first, custom_first, user_choice)
-# Determines which tools to use when both native and custom tools are available.
-# GEMINI_TOOLS_PRIORITY=native_first
-
-# Optional: Default behavior when no custom tools are provided in the request (default: true)
-# If true, native tools will be used by default.
+# GEMINI_TOOLS_PRIORITY=native_first    # native_first|custom_first|user_choice
 # DEFAULT_TO_NATIVE_TOOLS=true
-
-# Optional: Allow request-level tool control (default: true)
-# If true, allows request-level parameters to override environment settings for native tools.
 # ALLOW_REQUEST_TOOL_CONTROL=true
 
-# --- Citations and Grounding Configuration ---
-
-# Optional: Enable inline citations in responses (default: false)
-# ENABLE_INLINE_CITATIONS=true
-
-# Optional: Include grounding metadata in responses (default: true)
+# Citations and grounding
+# ENABLE_INLINE_CITATIONS=false
 # INCLUDE_GROUNDING_METADATA=true
-
-# Optional: Include search entry point HTML (default: false)
 # INCLUDE_SEARCH_ENTRY_POINT=false
+

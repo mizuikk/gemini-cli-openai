@@ -551,6 +551,10 @@ Content-Type: application/json
 }
 ```
 
+Note on streaming:
+- Default behavior is non-streaming (aligned with OpenAI official behavior).
+- To enable streaming, set `"stream": true` in the request body or set the header `Accept: text/event-stream`.
+
 #### Thinking Mode (Real Reasoning)
 For models that support thinking, you can enable real reasoning from Gemini:
 
