@@ -98,7 +98,9 @@ export function createOpenAIStreamTransformer(
 	let toolCallName: string | null = null;
 	let usageData: UsageData | undefined;
 
-    const mode = (outputMode || "tagged").toLowerCase();
+    // Normalize output mode aliases: prefer "tagged"; accept legacy "think-tags" as alias
+    const rawMode = (outputMode || "tagged").toLowerCase();
+    const mode = rawMode === "think-tags" ? "tagged" : rawMode;
     const isR1 = mode === "r1"; // DeepSeek Reasoner-compatible stream
 
     return new TransformStream({
@@ -223,9 +225,14 @@ export function createOpenAIStreamTransformer(
 
             // In R1 mode, DeepSeek also returns completion_tokens_details on responses;
             // for stream chunks we append the same object fields to the final event payload.
-            const payload: Record<string, unknown> = { ...finalChunk } as Record<string, unknown>;
+            type R1FinalPayload = OpenAIFinalChunk & {
+                completion_tokens_details?: {
+                    reasoning_tokens: number;
+                };
+            };
+            const payload: R1FinalPayload = { ...finalChunk } as R1FinalPayload;
             if (isR1) {
-                (payload as any).completion_tokens_details = {
+                payload.completion_tokens_details = {
                     // Without tokenizer we can only provide a conservative placeholder
                     // to match the field shape; downstream can ignore if unused.
                     reasoning_tokens: 0

@@ -44,9 +44,9 @@ Transform Google's Gemini models into OpenAI-compatible endpoints using Cloudfla
   - `medium`: Sets `thinking_budget = 12288` for flash models, `16384` for other models.
   - `high`: Sets `thinking_budget = 24576` for flash models, `32768` for other models.
 > 
-> Set `REASONING_OUTPUT_MODE=tagged` to stream reasoning as content with `<think>` tags (Dify Tagged style). Use `hidden` to suppress thought content and only return the final answer.
+> **Reasoning Output**: Control how reasoning is presented with `REASONING_OUTPUT_MODE`. Use `field` (recommended for most clients) to send reasoning in aseparate field, `tagged` for specialized UIs like Dify that render `<think>` tags, or `hidden` to suppress it entirely.
 
-## �🛠️ Setup
+## 🛠️ Setup
 
 ### Prerequisites
 
@@ -168,7 +168,8 @@ npm run dev
 |----------|-------------|
 | `ENABLE_FAKE_THINKING` | Enable synthetic thinking output for testing (set to `"true"`). |
 | `ENABLE_REAL_THINKING` | Enable real Gemini thinking output (set to `"true"`). |
-| `REASONING_OUTPUT_MODE` | Reasoning presentation: `tagged` (inline `<think>`), `field` (delta.reasoning), `hidden` (suppress), or `r1` (DeepSeek Reasoner-compatible: stream `delta.reasoning_content`; non-stream returns `message.reasoning_content`). |
+| `REASONING_OUTPUT_MODE` | Sets reasoningformat. **`field`** (recommended) uses a separate `delta.reasoning` field. **`tagged`** is for UIs like Dify that handle inline `<think>` tags. **`hidden`** suppresses reasoning. **`r1`** provides DeepSeek compatibility. |
+| `REASONING_TAGGED_NONSTREAM` | For non-streaming responses in `tagged` mode: `omit` (default) excludes the ``. Ignored in `r1` mode. |
 
 #### Model & Feature Flags
 
@@ -206,7 +207,7 @@ npm run dev
 - Real thinking provides genuine reasoning from Gemini and requires thinking-capable models (like Gemini 2.5 Pro/Flash).
 - You can control the reasoning token budget with the `thinking_budget` parameter.
 - By default, reasoning output is streamed as `reasoning` chunks in the OpenAI-compatible response format.
-- When `REASONING_OUTPUT_MODE=tagged`, reasoning is streamed inline wrapped in `<think></think>` tags (Dify Tagged style).
+- When `REASONING_OUTPUT_MODE=tagged`, reasoning is streamed inline wrapped in `` tags. This is intended for specialized UIs like Dify and may cause unexpected output in standard clients. For example, an autonomous AI agent could use this to "think out loud" about its plan, like `<think>I will first analyze the error log to find the root cause.</think>` before showing the code fix.
 - When `REASONING_OUTPUT_MODE=r1`, streamed reasoning appears in `choices[0].delta.reasoning_content` and non-streaming responses include `choices[0].message.reasoning_content`, matching DeepSeek Reasoner specs.
 - **Optimized UX**: The `</think>` tag is only sent when the actual LLM response begins, eliminating awkward pauses between thinking and response.
 - If neither thinking mode is enabled, thinking models will behave like regular models.
@@ -294,10 +295,9 @@ response = litellm.completion(
 
 for chunk in response:
     if chunk.choices[0].delta.content:
-        print(chunk.choices[0].delta.content, end="")
-```
+        print(chunk.choices[0].delta.content, end="")```
 
-**Pro Tip**: Set `REASONING_OUTPUT_MODE=tagged` to stream reasoning as content with `<think>` tags (Dify Tagged style). Use `hidden` to suppress thought content and only return the final answer. Set `r1` to emit DeepSeek-compatible `reasoning_content` fields.
+**Pro Tip**: For most chat clients, set `REASONING_OUTPUT_MODE=field` to get reasoning in a separate data field, or `hidden` to disable it. Use `tagged` only if your client is built to render `<think>` tags, like Dify.
 
 ### DeepSeek R1 Mode
 
@@ -460,14 +460,12 @@ while (true) {
   const chunk = decoder.decode(value);
   const lines = chunk.split('\### Dify Compatibility: Reasoning Format
 
-This worker supports Dify''s Tagged/Separated reasoning formats via a single request parameter and standardized `<think>...</think>` tags.
-
-- Reasoning format: set `reasoning_format` to `"tagged"` or `"separated"` in the root body, or under `extra_body` / `model_params`.
-- Default behavior when present: both `tagged` and `separated` cause the server to inline reasoning as `<think>` blocks in `delta.content`. Dify clients decide how to render:
+This worker supports Dify''s Tagged/Separated reasoning formats via a single request parameter and standardized `` tags.- Reasoning format: set `reasoning_format` to `"tagged"` or `"separated"` in the root body, or under `extra_body` / `model_params`.
+- When easoning_format is present: 	agged streams inline <think> in delta.content; separated streams in adedicated field (no <think> in delta.content).
   - `tagged`: keep and display the `<think>` block.
   - `separated`: strip the `<think>` block and show clean text; the thinking content is displayed separately by the client.
-- If `reasoning_format` is not provided, behavior falls back to environment:
-  - `REASONING_OUTPUT_MODE=tagged` → inline `<think>` blocks in `delta.content`.
+- If `reasoning_format` is notprovided, behavior falls back to environment:
+  - `REASONING_OUTPUT_MODE=tagged` → inline `<think>` blocks in `delta.content` (for specialized UIs).
   - Otherwise → reasoning appears in `delta.reasoning` (separate field).
 
 Example (streaming, Tagged):
@@ -481,7 +479,7 @@ Example (streaming, Tagged):
   "reasoning_format": "tagged"
 }
 ```
-SSE will begin with `delta.content` that starts a `<think>` block, followed by thought chunks, then a closing `</think>` before the first normal content.
+SSE will begin with `delta.content` that starts a `` before the first normal content.
 
 Example (streaming, Separated):
 ```jsonc
@@ -492,14 +490,49 @@ Example (streaming, Separated):
   "reasoning_format": "separated"
 }
 ```
-Server still emits `<think>` blocks in `delta.content`. Dify''s Separated mode will strip them and present the reasoning separately. For custom clients, you can remove the block via:
-```js
-const display = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+Reasoning is emitted as a separate stream field (no <think> tags in delta.content).
+
+
+
+
+### Tagged v1 (Non-Streaming Inline Control)
+
+When not streaming, Tagged v1 defaults to omitting the `` block from the final `message.content`.
+
+- Env: set `REASONING_TAGGED_NONSTREAM=omit | inline` (default: `omit`).
+- Request override: `extra_body.tagged_nonstream` or `model_params.tagged_nonstream` with `"omit" | "inline"` (request takes precedence over env).
+- In `r1` mode this inline control is ignored; R1 only uses the `reasoning_content` field.
+
+Examples (non-streaming):
+
+```jsonc
+// Default (omit)
+{
+  "model": "gemini-2.5-flash",
+  "messages": [{ "role": "user", "content": "Explain photosynthesis." }],
+  "stream": false
+}
+```
+
+```jsonc
+// Inline
+{
+  "model": "gemini-2.5-flash",
+  "messages": [{ "role": "user", "content": "Explain photosynthesis." }],
+  "stream": false,
+  "extra_body": { "tagged_nonstream": "inline" }
+}
+```Returned content when `inline` is selected:
+
+```
+
+
+<final assistant content>
 ```
 
 Notes:
 - Non-streaming responses do not include reasoning chunks; only final content (and optional usage) is returned.
-- The project migrated from `<think>` to `<think>` tags for Dify compatibility. Update any custom regex accordingly.
+- The project migrated from `<think>`to `<think>` tags for Dify compatibility. Update any custom regex accordingly.
 - You may also control the depth via `reasoning_effort` (`none|low|medium|high`) or explicit `thinking_budget`.
 ```n');
   
@@ -541,7 +574,7 @@ for line in response.iter_lines():
             continue
 ```
 
-## � Tool Calling Support
+##  Tool Calling Support
 
 The worker supports OpenAI-compatible tool calling (function calling) with seamless integration to Gemini's function calling capabilities.
 
@@ -879,9 +912,6 @@ Any other form of distribution, sublicensing, or commercial use is strictly proh
 
 
 [![Star History Chart](https://api.star-history.com/svg?repos=GewoonJaap/gemini-cli-openai&type=Date)](https://www.star-history.com/#GewoonJaap/gemini-cli-openai&Date)
-
-
-
 
 
 

@@ -1,15 +1,4 @@
-import {
-	Env,
-	StreamChunk,
-	ReasoningData,
-	ReasoningEndData,
-	UsageData,
-	ChatMessage,
-	MessageContent,
-	Tool,
-	ToolChoice,
-	GeminiFunctionCall
-} from "./types";
+import { Env, StreamChunk, ReasoningData, UsageData, ChatMessage, MessageContent, Tool, ToolChoice, GeminiFunctionCall } from "./types";
 import { AuthManager } from "./auth";
 import { CODE_ASSIST_ENDPOINT, CODE_ASSIST_API_VERSION } from "./config";
 import { REASONING_MESSAGES, REASONING_CHUNK_DELAY, THINKING_CONTENT_CHUNK_SIZE } from "./constants";
@@ -334,16 +323,20 @@ export class GeminiApiClient {
 		const isThinkingModel = geminiCliModels[modelId]?.thinking || false;
 		const isRealThinkingEnabled = this.env.ENABLE_REAL_THINKING === "true";
 		const isFakeThinkingEnabled = this.env.ENABLE_FAKE_THINKING === "true";
-		const outputMode = (this.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
+		// Normalize output mode aliases (prefer "tagged"; accept legacy "think-tags")
+		const __envModeRaw = (this.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
+		const outputMode = __envModeRaw === "think-tags" ? "tagged" : __envModeRaw;
 		const hideThinkingByEnv = outputMode === "hidden";
 		const envWantsTagged = outputMode === "tagged";
+		const isR1Mode = outputMode === "r1";
 		// Request-level Dify hint takes precedence for presentation, unless env forces hidden
-		const streamThinkingAsContent = hideThinkingByEnv
-			? false
-			: options?.reasoning_format
-				? options.reasoning_format === "tagged" || options.reasoning_format === "separated"
-				: envWantsTagged;
-		const includeReasoning = options?.includeReasoning || false;
+		// Important: "separated" means client wants a clean separation (no inline <think>)
+		const streamThinkingAsContent =
+			!isR1Mode &&
+			!hideThinkingByEnv &&
+			(options?.reasoning_format ? options.reasoning_format === "tagged" : envWantsTagged);
+		// If caller specifies a reasoning_format, infer includeReasoning=true unless explicitly disabled
+		const includeReasoning = options?.includeReasoning || Boolean(options?.reasoning_format) || false;
 
 		const req = {
 			thinking_budget: options?.thinkingBudget,
@@ -602,14 +595,16 @@ export class GeminiApiClient {
 		let hasStartedThinking = false;
 		let hasSentRealThinking = false;
 
-		for await (const jsonData of this.parseSSEStream(response.body)) {
+        for await (const jsonData of this.parseSSEStream(response.body)) {
 			const candidate = jsonData.response?.candidates?.[0];
 
 			if (candidate?.content?.parts) {
 				for (const part of candidate.content.parts as GeminiPart[]) {
 					// Handle real thinking content from Gemini
 					if (part.thought === true && part.text) {
-						const thinkingText = part.text;
+						// Some Gemini responses may already include <think> tags inside thought parts.
+						// Strip any explicit tags to avoid nested/duplicate tagging downstream.
+						const thinkingText = part.text.replace(/<\/?think>/gi, "");
 
 					if (hideThinkingByEnv) {
 						// Suppress thinking entirely
@@ -638,18 +633,18 @@ export class GeminiApiClient {
 							hasSentRealThinking = true;
 						}
 					}
-					// Check if text content contains <think> tags (based on your original example)
+					// Check if text content contains <think> tags (defensive: when API doesn't set part.thought)
 					else if (part.text && part.text.includes("<think>")) {
 						if (hideThinkingByEnv) {
 							// Only output non-thinking content
-							const nonThinking = part.text.replace(/<think>.*?<\/think>/gs, "").trim();
+							const nonThinking = part.text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 							if (nonThinking) {
 								yield { type: "text", data: nonThinking };
 							}
 						} else if (realThinkingAsContent) {
 							// Extract thinking content and convert to our format
-							const thinkingMatch = part.text.match(/<think>(.*?)<\/think>/s);
-							if (thinkingMatch) {
+							const thinkBlocks = [...part.text.matchAll(/<think>([\s\S]*?)<\/think>/g)].map((m) => m[1]);
+							if (thinkBlocks.length > 0) {
 								if (!hasStartedThinking) {
 									yield {
 										type: "thinking_content",
@@ -657,15 +652,13 @@ export class GeminiApiClient {
 									};
 									hasStartedThinking = true;
 								}
-
-								yield {
-									type: "thinking_content",
-									data: thinkingMatch[1]
-								};
+								for (const tb of thinkBlocks) {
+									yield { type: "thinking_content", data: tb };
+								}
 							}
 
 							// Extract any non-thinking coRecentent
-							const nonThinkingContent = part.text.replace(/<think>.*?<\/think>/gs, "").trim();
+							const nonThinkingContent = part.text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 							if (nonThinkingContent) {
 								if (hasStartedThinking && !hasClosedThinking) {
 									yield {
@@ -678,19 +671,18 @@ export class GeminiApiClient {
 							}
 						} else {
 							// Stream thinking as separate reasoning field
-							const thinkingMatch = part.text.match(/<think>(.*?)<\/think>/s);
-							if (thinkingMatch) {
+							const thinkBlocks = [...part.text.matchAll(/<think>([\s\S]*?)<\/think>/g)].map((m) => m[1]);
+							if (thinkBlocks.length > 0) {
 								if (!hideThinkingByEnv) {
-									yield {
-										type: "real_thinking",
-										data: thinkingMatch[1]
-									};
+									for (const tb of thinkBlocks) {
+										yield { type: "real_thinking", data: tb };
+									}
 									hasSentRealThinking = true;
 								}
 							}
 
 							// Stream non-thinking content as regular text
-							const nonThinkingContent = part.text.replace(/<think>.*?<\/think>/gs, "").trim();
+							const nonThinkingContent = part.text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 							if (nonThinkingContent) {
 								yield { type: "text", data: nonThinkingContent };
 							}
@@ -742,6 +734,11 @@ export class GeminiApiClient {
 			}
 
 			if (jsonData.response?.usageMetadata) {
+				// Ensure </think> is flushed before emitting usage metadata
+				if (realThinkingAsContent && !hideThinkingByEnv && hasStartedThinking && !hasClosedThinking) {
+					yield { type: "thinking_content", data: "\n</think>\n\n" };
+					hasClosedThinking = true;
+				}
 				const usage = jsonData.response.usageMetadata;
 				const usageData: UsageData = {
 					inputTokens: usage.promptTokenCount || 0,
@@ -753,14 +750,23 @@ export class GeminiApiClient {
 				};
 			}
 		}
-		
-		// Send reasoning end signal for field mode if real thinking was sent
-		if (hasSentRealThinking && !realThinkingAsContent && !hideThinkingByEnv) {
-			yield {
-				type: "reasoning_end",
-				data: { finished: true }
-			};
-		}
+        // If we streamed thinking as content and never emitted a closing tag,
+        // close it right before finishing the stream to avoid dangling <think> blocks.
+        if (realThinkingAsContent && !hideThinkingByEnv && hasStartedThinking && !hasClosedThinking) {
+            yield {
+                type: "thinking_content",
+                data: "\n</think>\n\n"
+            };
+            hasClosedThinking = true;
+        }
+
+        // Send reasoning end signal for field mode if real thinking was sent
+        if (hasSentRealThinking && !realThinkingAsContent && !hideThinkingByEnv) {
+            yield {
+                type: "reasoning_end",
+                data: { finished: true }
+            };
+        }
 	}
 
 	/**
@@ -797,16 +803,34 @@ export class GeminiApiClient {
 			let content = "";
 			let usage: UsageData | undefined;
 			let reasoning_content = "";
+			// Preserve ordering for non-stream inline mode to avoid fragile string normalization
+			const __orderedInlinePieces: string[] = [];
 			const tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> = [];
+
+			// Determine Tagged v1 non-stream behavior
+			const __rawMode = (this.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
+			const __normalizedMode = __rawMode === "think-tags" ? "tagged" : __rawMode;
+			const __isR1Mode = __normalizedMode === "r1";
+			const __reqTaggedNonstream = this.extractStringParam(options as Record<string, unknown> | undefined, "tagged_nonstream", (v): v is "omit" | "inline" => v === "omit" || v === "inline");
+			const __envTaggedNonstream = (this.env.REASONING_TAGGED_NONSTREAM || "omit").toLowerCase();
+			const __taggedNonstream: "omit" | "inline" = __reqTaggedNonstream ?? (__envTaggedNonstream === "inline" ? "inline" : "omit");
 
 			// Collect all chunks from the stream
 			for await (const chunk of this.streamContent(modelId, systemPrompt, messages, options)) {
 				if (chunk.type === "text" && typeof chunk.data === "string") {
-					content += chunk.data;
+					if (__taggedNonstream === "inline") {
+						__orderedInlinePieces.push(chunk.data);
+					} else {
+						content += chunk.data;
+					}
 				} else if (chunk.type === "usage" && typeof chunk.data === "object") {
 					usage = chunk.data as UsageData;
 				} else if (chunk.type === "real_thinking" && typeof chunk.data === "string") {
 					reasoning_content += chunk.data;
+				} else if (chunk.type === "thinking_content" && typeof chunk.data === "string") {
+					if (__taggedNonstream === "inline") {
+						__orderedInlinePieces.push(chunk.data);
+					}
 				} else if (chunk.type === "reasoning") {
 					const rd = chunk.data as ReasoningData;
 					if (rd && typeof rd.reasoning === "string") {
@@ -824,6 +848,15 @@ export class GeminiApiClient {
 					});
 				}
 				// Skip reasoning chunks for non-streaming responses
+			}
+
+			// Inline <think>...</think> for non-streaming when enabled (Tagged v1)
+			// Build final content by preserving the exact order emitted by the stream
+			if (!__isR1Mode && __taggedNonstream === "inline" && __orderedInlinePieces.length > 0) {
+				const joined = __orderedInlinePieces.join("");
+				// Best-effort cleanup: drop empty <think></think> blocks
+				const cleaned = joined.replace(/<think>\s*<\/think>\n?/g, "");
+				content = cleaned;
 			}
 
 			return {

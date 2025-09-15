@@ -21,6 +21,10 @@ export interface Env {
 	// "field":  send reasoning in a separate field (delta.reasoning)
 	// "hidden": hide reasoning completely and only return final content
 	REASONING_OUTPUT_MODE?: string;
+	// Tagged v1 (non-stream): control whether thinking is inlined into final message.content
+	// "omit" (default): exclude <think>...</think> from non-streaming responses
+	// "inline": prefix final content with a <think> block if available
+	REASONING_TAGGED_NONSTREAM?: string;
 	ENABLE_AUTO_MODEL_SWITCHING?: string; // Optional flag to enable automatic fallback from pro to flash on 429 errors (set to "true" to enable)
 	GEMINI_MODERATION_HARASSMENT_THRESHOLD?: SafetyThreshold;
 	GEMINI_MODERATION_HATE_SPEECH_THRESHOLD?: SafetyThreshold;
@@ -91,6 +95,9 @@ export interface ChatCompletionRequest {
     extra_body?: {
         reasoning_effort?: EffortLevel;
         reasoning_format?: ReasoningFormat;
+        // Tagged v1: non-stream inline control (request-level override)
+        // "omit" | "inline" (default is env: REASONING_TAGGED_NONSTREAM or "omit")
+        tagged_nonstream?: "omit" | "inline";
         enable_search?: boolean;
         enable_url_context?: boolean;
         enable_native_tools?: boolean;
@@ -99,6 +106,9 @@ export interface ChatCompletionRequest {
     model_params?: {
         reasoning_effort?: EffortLevel;
         reasoning_format?: ReasoningFormat;
+        // Tagged v1: non-stream inline control (request-level override)
+        // "omit" | "inline" (default is env: REASONING_TAGGED_NONSTREAM or "omit")
+        tagged_nonstream?: "omit" | "inline";
         enable_search?: boolean;
         enable_url_context?: boolean;
         enable_native_tools?: boolean;

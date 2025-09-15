@@ -16,15 +16,37 @@ GCP_SERVICE_ACCOUNT={"access_token":"ya29...","refresh_token":"1//...","scope":"
 # Recommended format: sk-<random>
 # OPENAI_API_KEY=sk-your-secret-api-key-here
 
-# Thinking modes (choose based on your needs)
-# ENABLE_FAKE_THINKING=true           # Streams synthetic reasoning for demos/tests
-# ENABLE_REAL_THINKING=true           # Enables Gemini native reasoning output
-# REASONING_OUTPUT_MODE=tagged        # tagged | field | hidden | r1
-#   - tagged: inline <think>...</think> in content (DeepSeek/Dify style)
-#   - field:  send reasoning in delta.reasoning (no tags in content)
-#   - hidden: suppress reasoning entirely, return only final content
-#   - r1:     DeepSeek Reasoner compatible mode. Streams reasoning via `delta.reasoning_content`,
-#             and includes `message.reasoning_content` in the final response; JSON shape aligns with DeepSeek `/chat/completions`.
+# --- Reasoning (Thinking) Output Configuration ---
+#
+# This section controls how the model's reasoning process is delivered.
+# To enable reasoning, first set `ENABLE_REAL_THINKING=true`.
+
+# ENABLE_REAL_THINKING=true           # Enables Gemini's native reasoning output.
+
+# REASONING_OUTPUT_MODE=field         # Determines the format of the reasoning output.
+#
+# Available Modes:
+#
+#   - field: (RECOMMENDED FOR MOST CHAT CLIENTS)
+#     Sends reasoning in a separate `delta.reasoning` field in the SSE stream.
+#     The main `content` remains clean and free of special tags.
+#     Use this for standard OpenAI-compatible clients.
+#
+#   - tagged: (FOR SPECIALIZED UI INTEGRATIONS LIKE DIFY)
+#     Streams reasoning inline within the main `content`, wrapped in <think>...</think> blocks.
+#     Only use this if your client is specifically designed to handle and render these tags (e.g., Dify).
+#
+#   - hidden: (FOR PRODUCTION OR WHEN REASONING IS NOT NEEDED)
+#     Completely suppresses the reasoning output. You will only receive the final,
+#     clean content. This is the most efficient option if you don't need to see
+#     the model's thought process.
+#
+#   - r1: (FOR DEEPSEEK REASONER COMPATIBILITY)
+#     A specialized mode for integrations expecting the DeepSeek Reasoner API format.
+#     Streams reasoning via `delta.reasoning_content`.
+
+# Tagged v1 (non-stream) inline control
+# REASONING_TAGGED_NONSTREAM=omit     # omit | inline (default omit)
 
 # Auto model switching (pro -> flash on 429/503)
 # ENABLE_AUTO_MODEL_SWITCHING=true
