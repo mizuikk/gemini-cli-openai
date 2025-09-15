@@ -44,7 +44,7 @@ Transform Google's Gemini models into OpenAI-compatible endpoints using Cloudfla
   - `medium`: Sets `thinking_budget = 12288` for flash models, `16384` for other models.
   - `high`: Sets `thinking_budget = 24576` for flash models, `32768` for other models.
 > 
-> Set `STREAM_THINKING_AS_CONTENT=true` to stream reasoning as content with `<think>` tags (Dify Tagged style) instead of using the reasoning field.
+> Set `REASONING_OUTPUT_MODE=tagged` to stream reasoning as content with `<think>` tags (Dify Tagged style). Use `hidden` to suppress thought content and only return the final answer.
 
 ## �🛠️ Setup
 
@@ -168,7 +168,7 @@ npm run dev
 |----------|-------------|
 | `ENABLE_FAKE_THINKING` | Enable synthetic thinking output for testing (set to `"true"`). |
 | `ENABLE_REAL_THINKING` | Enable real Gemini thinking output (set to `"true"`). |
-| `STREAM_THINKING_AS_CONTENT` | Stream thinking as content with `<think>` tags (Dify Tagged style). |
+| `REASONING_OUTPUT_MODE` | Reasoning presentation: `tagged` (inline `<think>`), `field` (delta.reasoning), or `hidden` (suppress). |
 
 #### Model & Feature Flags
 
@@ -206,7 +206,7 @@ npm run dev
 - Real thinking provides genuine reasoning from Gemini and requires thinking-capable models (like Gemini 2.5 Pro/Flash).
 - You can control the reasoning token budget with the `thinking_budget` parameter.
 - By default, reasoning output is streamed as `reasoning` chunks in the OpenAI-compatible response format.
-- When `STREAM_THINKING_AS_CONTENT` is also set to `"true"`, reasoning will be streamed as regular content wrapped in `<think></think>` tags (Dify Tagged style).
+- When `REASONING_OUTPUT_MODE=tagged`, reasoning is streamed inline wrapped in `<think></think>` tags (Dify Tagged style).
 - **Optimized UX**: The `</think>` tag is only sent when the actual LLM response begins, eliminating awkward pauses between thinking and response.
 - If neither thinking mode is enabled, thinking models will behave like regular models.
 
@@ -296,7 +296,7 @@ for chunk in response:
         print(chunk.choices[0].delta.content, end="")
 ```
 
-**Pro Tip**: Set `STREAM_THINKING_AS_CONTENT=true` for optimal LiteLLM and Dify compatibility. The `<think>` tags format works better with downstream parsers.
+**Pro Tip**: Set `REASONING_OUTPUT_MODE=tagged` to stream reasoning as content with `<think>` tags (Dify Tagged style). Use `hidden` to suppress thought content and only return the final answer.
 
 ### OpenAI SDK (Python)
 ```python
@@ -411,7 +411,7 @@ This worker supports Dify''s Tagged/Separated reasoning formats via a single req
   - `tagged`: keep and display the `<think>` block.
   - `separated`: strip the `<think>` block and show clean text; the thinking content is displayed separately by the client.
 - If `reasoning_format` is not provided, behavior falls back to environment:
-  - `STREAM_THINKING_AS_CONTENT=true` → inline `<think>` blocks in `delta.content`.
+  - `REASONING_OUTPUT_MODE=tagged` → inline `<think>` blocks in `delta.content`.
   - Otherwise → reasoning appears in `delta.reasoning` (separate field).
 
 Example (streaming, Tagged):
@@ -823,6 +823,8 @@ Any other form of distribution, sublicensing, or commercial use is strictly proh
 
 
 [![Star History Chart](https://api.star-history.com/svg?repos=GewoonJaap/gemini-cli-openai&type=Date)](https://www.star-history.com/#GewoonJaap/gemini-cli-openai&Date)
+
+
 
 
 

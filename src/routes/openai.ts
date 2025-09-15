@@ -54,7 +54,6 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 			(body.reasoning_format || body.extra_body?.reasoning_format || body.model_params?.reasoning_format || "tagged") as
 				| "tagged"
 				| "separated";
-		const streamReasoningAsContent = reasoning_format === "tagged"; // tagged => inline <think> tags
 
 		// Newly added parameters
 		const generationOptions = {

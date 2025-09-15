@@ -333,11 +333,15 @@ export class GeminiApiClient {
 		const isThinkingModel = geminiCliModels[modelId]?.thinking || false;
 		const isRealThinkingEnabled = this.env.ENABLE_REAL_THINKING === "true";
 		const isFakeThinkingEnabled = this.env.ENABLE_FAKE_THINKING === "true";
-		const streamThinkingAsContent =
-			options?.reasoning_format
-				? // For Dify both 'tagged' and 'separated' rely on <think> blocks in content
-				  (options.reasoning_format === "tagged" || options.reasoning_format === "separated")
-				: this.env.STREAM_THINKING_AS_CONTENT === "true";
+		const outputMode = (this.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
+		const hideThinkingByEnv = outputMode === "hidden";
+		const envWantsTagged = outputMode === "tagged";
+		// Request-level Dify hint takes precedence for presentation, unless env forces hidden
+		const streamThinkingAsContent = hideThinkingByEnv
+			? false
+			: options?.reasoning_format
+				? options.reasoning_format === "tagged" || options.reasoning_format === "separated"
+				: envWantsTagged;
 		const includeReasoning = options?.includeReasoning || false;
 
 		const req = {
@@ -375,7 +379,7 @@ export class GeminiApiClient {
 
 		// For thinking models with fake thinking (fallback when real thinking is not enabled or not requested)
 		let needsThinkingClose = false;
-		if (isThinkingModel && isFakeThinkingEnabled && !includeReasoning) {
+		if (isThinkingModel && isFakeThinkingEnabled && !includeReasoning && !hideThinkingByEnv) {
 			yield* this.generateReasoningOutput(messages, streamThinkingAsContent);
 			needsThinkingClose = streamThinkingAsContent; // Only need to close if we streamed as content
 		}
@@ -412,7 +416,8 @@ export class GeminiApiClient {
 			false,
 			includeReasoning && streamThinkingAsContent,
 			modelId,
-			nativeToolsManager
+			nativeToolsManager,
+			hideThinkingByEnv
 		);
 	}
 
@@ -520,7 +525,8 @@ export class GeminiApiClient {
 		isRetry: boolean = false,
 		realThinkingAsContent: boolean = false,
 		originalModel?: string,
-		nativeToolsManager?: NativeToolsManager
+		nativeToolsManager?: NativeToolsManager,
+		hideThinkingByEnv: boolean = false
 	): AsyncGenerator<StreamChunk> {
 		const citationsProcessor = new CitationsProcessor(this.env);
 		const response = await fetch(`${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:streamGenerateContent?alt=sse`, {
@@ -543,7 +549,8 @@ export class GeminiApiClient {
 					true,
 					realThinkingAsContent,
 					originalModel,
-					nativeToolsManager
+					nativeToolsManager,
+					hideThinkingByEnv
 				); // Retry once
 				return;
 			}
@@ -574,7 +581,8 @@ export class GeminiApiClient {
 						true,
 						realThinkingAsContent,
 						originalModel,
-						nativeToolsManager
+						nativeToolsManager,
+						hideThinkingByEnv
 					);
 					return;
 				}
@@ -601,6 +609,10 @@ export class GeminiApiClient {
 					if (part.thought === true && part.text) {
 						const thinkingText = part.text;
 
+					if (hideThinkingByEnv) {
+						// Suppress thinking entirely
+						continue;
+					}
 					if (realThinkingAsContent) {
 						// Stream as content with <think> tags (Dify Tagged)
 						if (!hasStartedThinking) {
@@ -625,7 +637,13 @@ export class GeminiApiClient {
 					}
 					// Check if text content contains <think> tags (based on your original example)
 					else if (part.text && part.text.includes("<think>")) {
-						if (realThinkingAsContent) {
+						if (hideThinkingByEnv) {
+							// Only output non-thinking content
+							const nonThinking = part.text.replace(/<think>.*?<\/think>/gs, "").trim();
+							if (nonThinking) {
+								yield { type: "text", data: nonThinking };
+							}
+						} else if (realThinkingAsContent) {
 							// Extract thinking content and convert to our format
 							const thinkingMatch = part.text.match(/<think>(.*?)<\/think>/s);
 							if (thinkingMatch) {
@@ -659,10 +677,12 @@ export class GeminiApiClient {
 							// Stream thinking as separate reasoning field
 							const thinkingMatch = part.text.match(/<think>(.*?)<\/think>/s);
 							if (thinkingMatch) {
-								yield {
-									type: "real_thinking",
-									data: thinkingMatch[1]
-								};
+								if (!hideThinkingByEnv) {
+									yield {
+										type: "real_thinking",
+										data: thinkingMatch[1]
+									};
+								}
 							}
 
 							// Stream non-thinking content as regular text
@@ -675,7 +695,7 @@ export class GeminiApiClient {
 					// Handle regular content - only if it's not a thinking part and doesn't contain <think> tags
 					else if (part.text && !part.thought && !part.text.includes("<think>")) {
 						// Close thinking tag before first real content if needed
-						if ((needsThinkingClose || (realThinkingAsContent && hasStartedThinking)) && !hasClosedThinking) {
+						if (!hideThinkingByEnv && (needsThinkingClose || (realThinkingAsContent && hasStartedThinking)) && !hasClosedThinking) {
 							yield {
 								type: "thinking_content",
 								data: "\n</think>\n\n"
@@ -695,7 +715,7 @@ export class GeminiApiClient {
 					// Handle function calls from Gemini
 					else if (part.functionCall) {
 						// Close thinking tag before function call if needed
-						if ((needsThinkingClose || (realThinkingAsContent && hasStartedThinking)) && !hasClosedThinking) {
+						if (!hideThinkingByEnv && (needsThinkingClose || (realThinkingAsContent && hasStartedThinking)) && !hasClosedThinking) {
 							yield {
 								type: "thinking_content",
 								data: "\n</think>\n\n"
