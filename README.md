@@ -231,11 +231,23 @@ You can control thinking via two request parameters in `extra_body`:
   - `"none"`: Disables thinking for the request.
 - **`thinking_budget`** (integer): Manually specify a token budget for reasoning.
 
-### Reasoning Output Format (`REASONING_OUTPUT_MODE`)-   **`field` (Recommended)**: Reasoning is sent in a separate `delta.reasoning` field. Clean and easy to parse.
--   **`tagged`**: Reasoning is wrapped in `<think>` tags and inlined with the content. Useful for UIs like Dify.
--   **`hidden`**: Suppresses all reasoning output.
+### Reasoning Output Format (`REASONING_OUTPUT_MODE`)
+
+The `REASONING_OUTPUT_MODE` environment variable controls how reasoning ("thinking") output is presented in the API response.
+
+-   **`field` (Recommended)**: Reasoning is sent in a separate `delta.reasoning` field. This is the cleanest method for programmatic parsing.
+    -   **Streaming**: Reasoning chunks arrive as `{"reasoning": "..."}`. The final content arrives in a separate `{"content": "..."}` chunk.
+    -   **Non-Streaming**: The final response includes the complete reasoning text in a top-level `reasoning_content` field, separate from the `message.content`.-**`tagged` (Default)**: Reasoning is wrapped in `` tags and inlined with the content. This is useful for UIs like Dify that can render these tags.
+    -   **Streaming**: Chunks will be sent containing ``, followedby the actual message content.
+    -   **Non-Streaming**: By default (`REASONING_TAGGED_NONSTREAM="omit"`), the `<think>` block is removed from the final output. Set to `"inline"` to keep it.
+
+-   **`hidden`**: Suppresses all reasoning output from the response. You will only receive the final content.
+
 -   **`r1`**: Formats the output to be compatible with DeepSeek Coder / Reasoner clients.
--   **`all`**: Exposes all modes on prefixed endpoints (e.g., `/field/v1`, `/tagged/v1`), allowing different clients to use their preferred format.
+    -   **Streaming**: Reasoning chunks are sent in a `{"reasoning_content": "..."}` field.
+    -   **Non-Streaming**: The final `message` object contains both `content` and `reasoning_content` fields.
+
+-   **`all`**: Exposes all modes on prefixed endpoints (e.g., `/field/v1`, `/tagged/v1`), allowing different clients to use their preferred format without changing worker configuration.
 
 ### Example: Real Thinking with Python
 
