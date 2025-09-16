@@ -237,7 +237,8 @@ The `REASONING_OUTPUT_MODE` environment variable controls how reasoning ("thinki
 
 -   **`field` (Recommended)**: Reasoning is sent in a separate `delta.reasoning` field. This is the cleanest method for programmatic parsing.
     -   **Streaming**: Reasoning chunks arrive as `{"reasoning": "..."}`. The final content arrives in a separate `{"content": "..."}` chunk.
-    -   **Non-Streaming**: The final response includes the complete reasoning text in a top-level `reasoning_content` field, separate from the `message.content`.-**`tagged` (Default)**: Reasoning is wrapped in `` tags and inlined with the content. This is useful for UIs like Dify that can render these tags.
+    -   **Non-Streaming**: The final response includes the complete reasoning text in a top-level `reasoning_content` field, separate from the `message.content`.
+-   **`tagged` (Default)**: Reasoning is wrapped in `` tags and inlined with the content. This is useful for UIs like Dify that can render these tags.
     -   **Streaming**: Chunks will be sent containing ``, followedby the actual message content.
     -   **Non-Streaming**: By default (`REASONING_TAGGED_NONSTREAM="omit"`), the `<think>` block is removed from the final output. Set to `"inline"` to keep it.
 
