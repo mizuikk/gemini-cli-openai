@@ -13,6 +13,142 @@ import { NativeToolsConfiguration } from "../types/native-tools";
  * Handles model-specific limitations and provides sensible defaults.
  */
 export class GenerationConfigValidator {
+	// --- Internal: JSON Schema (OpenAI-style) -> Gemini Schema converter ---
+	private static toGeminiType(type: unknown): string | undefined {
+		if (Array.isArray(type)) {
+			// e.g. ["string", "null"]
+			const nonNull = type.find((t) => t !== "null");
+			return this.toGeminiType(nonNull);
+		}
+		switch (typeof type === "string" ? type.toLowerCase() : "") {
+			case "object":
+				return "OBJECT";
+			case "string":
+				return "STRING";
+			case "number":
+				return "NUMBER";
+			case "integer":
+				return "INTEGER";
+			case "boolean":
+				return "BOOLEAN";
+			case "array":
+				return "ARRAY";
+			default:
+				return undefined;
+		}
+	}
+
+	private static normalizeProperties(input: unknown): Record<string, unknown> | undefined {
+		if (!input) return undefined;
+		if (Array.isArray(input)) {
+			// Accept arrays of [key, value] tuples or {key, value} objects
+			const obj: Record<string, unknown> = {};
+			for (const item of input as unknown[]) {
+				if (Array.isArray(item) && item.length >= 2 && typeof item[0] === "string") {
+					obj[item[0]] = item[1];
+				} else if (item && typeof item === "object" && "key" in (item as any) && "value" in (item as any)) {
+					const k = (item as any).key;
+					if (typeof k === "string") obj[k] = (item as any).value;
+				} else if (item && typeof item === "object" && "name" in (item as any) && "schema" in (item as any)) {
+					const k = (item as any).name;
+					if (typeof k === "string") obj[k] = (item as any).schema;
+				}
+			}
+			return obj;
+		}
+		if (typeof input === "object") return input as Record<string, unknown>;
+		return undefined;
+	}
+
+	private static stripUnsupportedKeys(schema: Record<string, unknown>): Record<string, unknown> {
+		const allowList = new Set([
+			"type",
+			"description",
+			"properties",
+			"items",
+			"required",
+			"enum",
+			"format",
+			"nullable"
+		]);
+
+		const out: Record<string, unknown> = {};
+		for (const [k, v] of Object.entries(schema)) {
+			if (k.startsWith("$")) continue; // drop $schema, $id, etc.
+			if (!allowList.has(k)) continue; // drop unknown keys like additionalProperties, oneOf, exclusiveMinimum...
+			out[k] = v as unknown;
+		}
+		return out;
+	}
+
+	private static convertJSONSchemaToGeminiSchema(input: unknown): Record<string, unknown> | undefined {
+		if (!input || typeof input !== "object") return undefined;
+
+		const src = input as Record<string, unknown>;
+
+		// Start with a shallow copy restricted to known keys
+		const initial = this.stripUnsupportedKeys(src);
+
+		// Map type to Gemini enum string
+		if ((initial as any).type !== undefined) {
+			const mappedType = this.toGeminiType((initial as any).type);
+			if (mappedType) (initial as any).type = mappedType;
+			else delete (initial as any).type; // unknown types are removed
+		}
+
+		// Handle nullable if type contained null previously
+		if (Array.isArray((src as any).type) && (src as any).type.includes("null")) {
+			(initial as any).nullable = true;
+		}
+
+		// Normalize properties
+		if ((src as any).properties !== undefined) {
+			const props = this.normalizeProperties((src as any).properties);
+			if (props) {
+				const convertedProps: Record<string, unknown> = {};
+				for (const [name, sub] of Object.entries(props)) {
+					const conv = this.convertJSONSchemaToGeminiSchema(sub);
+					if (conv) convertedProps[name] = conv;
+				}
+				if (Object.keys(convertedProps).length > 0) (initial as any).properties = convertedProps;
+			}
+		}
+
+		// Items (arrays)
+		if ((src as any).items !== undefined) {
+			if (Array.isArray((src as any).items)) {
+				// If items is an array, pick the first schema
+				const first = ((src as any).items as unknown[])[0];
+				const conv = this.convertJSONSchemaToGeminiSchema(first);
+				if (conv) (initial as any).items = conv;
+			} else {
+				const conv = this.convertJSONSchemaToGeminiSchema((src as any).items);
+				if (conv) (initial as any).items = conv;
+			}
+		}
+
+		// required
+		if (Array.isArray((src as any).required)) {
+			(initial as any).required = ((src as any).required as unknown[]).filter((r) => typeof r === "string");
+		}
+
+		// enum
+		if (Array.isArray((src as any).enum)) {
+			(initial as any).enum = (src as any).enum as unknown[];
+		}
+
+		// description
+		if (typeof (src as any).description === "string") {
+			(initial as any).description = (src as any).description;
+		}
+
+		// format (strings)
+		if (typeof (src as any).format === "string") {
+			(initial as any).format = (src as any).format;
+		}
+
+		return initial;
+	}
 	/**
 	 * Maps reasoning effort to thinking budget based on model type.
 	 * @param effort - The reasoning effort level
@@ -193,24 +329,11 @@ export class GenerationConfigValidator {
 		// Add tools configuration if provided
 		if (Array.isArray(options.tools) && options.tools.length > 0) {
 			const functionDeclarations = options.tools.map((tool) => {
-				let parameters = tool.function.parameters;
-				// Filter parameters for Claude-style compatibility by removing keys starting with '$'
-				if (parameters) {
-					const before = parameters;
-					parameters = Object.keys(parameters)
-						.filter((key) => !key.startsWith("$"))
-						.reduce(
-							(after, key) => {
-								after[key] = before[key];
-								return after;
-							},
-							{} as Record<string, unknown>
-						);
-				}
+				const converted = this.convertJSONSchemaToGeminiSchema(tool.function.parameters || {});
 				return {
 					name: tool.function.name,
 					description: tool.function.description,
-					parameters
+					parameters: converted
 				};
 			});
 
@@ -246,7 +369,11 @@ export class GenerationConfigValidator {
 			return {
 				tools: [
 					{
-						functionDeclarations: config.customTools.map((t) => t.function)
+						functionDeclarations: config.customTools.map((t) => ({
+							name: t.function.name,
+							description: t.function.description,
+							parameters: this.convertJSONSchemaToGeminiSchema(t.function.parameters || {})
+						}))
 					}
 				],
 				toolConfig: toolConfig
