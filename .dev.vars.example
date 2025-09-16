@@ -81,3 +81,7 @@ GCP_SERVICE_ACCOUNT={"access_token":"ya29...","refresh_token":"1//...","scope":"
 # ENABLE_INLINE_CITATIONS=false
 # INCLUDE_GROUNDING_METADATA=true
 # INCLUDE_SEARCH_ENTRY_POINT=false
+
+# --- HTTP/CORS & Logging ---
+# CORS_ALLOW_ORIGIN=http://localhost:3000   # Allowed origin for CORS responses (default: *)
+# LOG_LEVEL=info                            # debug|info|warn|error (debug logs request bodies for POST/PUT/PATCH)

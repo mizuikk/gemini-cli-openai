@@ -17,7 +17,7 @@ export const loggingMiddleware = async (c: Context<{ Bindings: Env }>, next: Nex
 
 	// Log request body for POST/PUT/PATCH requests
 	let bodyLog = "";
-	if (["POST", "PUT", "PATCH"].includes(method)) {
+	if (c.env.LOG_LEVEL === "debug" && ["POST", "PUT", "PATCH"].includes(method)) {
 		try {
 			// Clone the request to read the body without consuming it
 			const clonedReq = c.req.raw.clone();

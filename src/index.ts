@@ -28,7 +28,7 @@ app.use("*", loggingMiddleware);
 // Add CORS headers for all requests
 app.use("*", async (c, next) => {
 	// Set CORS headers
-	c.header("Access-Control-Allow-Origin", "*");
+	c.header("Access-Control-Allow-Origin", c.env.CORS_ALLOW_ORIGIN || "*");
 	c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 	c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
 

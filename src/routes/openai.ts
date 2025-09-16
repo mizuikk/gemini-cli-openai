@@ -233,7 +233,7 @@ export function createOpenAIRoute(modeOverride?: string) {
 					"Content-Type": "text/event-stream",
 					"Cache-Control": "no-cache",
 					Connection: "keep-alive",
-					"Access-Control-Allow-Origin": "*",
+					"Access-Control-Allow-Origin": c.env.CORS_ALLOW_ORIGIN || "*",
 					"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 					"Access-Control-Allow-Headers": "Content-Type, Authorization"
 				}
@@ -299,8 +299,8 @@ export function createOpenAIRoute(modeOverride?: string) {
 			}
 		}
 	} catch (e: unknown) {
-		const errorMessage = e instanceof Error ? e.message : String(e);
-		console.error("Top-level error:", e);
+		const errorMessage = e instanceof Error ? e.message : "An unknown error occurred";
+		console.error("OpenAIRoute error:", e);
 		return c.json({ error: errorMessage }, 500);
 	}
     });

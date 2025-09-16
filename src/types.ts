@@ -39,7 +39,9 @@ export interface Env {
 	DEFAULT_TO_NATIVE_TOOLS?: string; // Default behavior when no custom tools provided (default: true)
 	ALLOW_REQUEST_TOOL_CONTROL?: string; // Allow request-level tool control (default: true)
 
-	// Citations and Grounding Configuration
+	// HTTP/CORS Configuration
+	CORS_ALLOW_ORIGIN?: string; // Allowed origin for CORS responses (default: "*")
+	LOG_LEVEL?: "debug" | "info" | "warn" | "error"; // Log level; when "debug" request bodies may be logged
 	ENABLE_INLINE_CITATIONS?: string; // Enable inline citations in responses (default: false)
 	INCLUDE_GROUNDING_METADATA?: string; // Include grounding metadata in responses (default: true)
 	INCLUDE_SEARCH_ENTRY_POINT?: string; // Include search entry point HTML (default: false)
