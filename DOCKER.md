@@ -59,17 +59,19 @@ This document provides instructions for running the Gemini CLI OpenAI Worker in 
 /app/
 ├── src/                 # Your TypeScript source code
 ├── .dev.vars           # Environment variables (injected by wrangler)
-├── wrangler.toml       # Cloudflare Worker configuration
+├── wrangler.toml       # Cloudflare Worker configuration (no KV IDs)
+├── .wrangler.generated.toml  # Auto-generated config with KV IDs (gitignored)
 ├── package.json        # Node.js dependencies
 └── .mf/kv/            # Persistent KV storage (Docker volume)
 ```
 
 ### Environment Variables
 
-Your `.dev.vars` file is automatically loaded by `wrangler dev` inside the container. The following variables are supported:
+Your `.dev.vars` file is automatically loaded by the startup script and `wrangler dev` inside the container. The following variables are supported:
 
-- `GOOGLE_OAUTH_CREDS_JSON`: Required Google OAuth credentials
+- `GCP_SERVICE_ACCOUNT`: Required Google OAuth credentials (JSON string in one line)
 - `GEMINI_PROJECT_ID`: Optional Google Cloud Project ID
+- `GEMINI_CLI_KV_ID`: KV namespace ID used by the generator to inject into `.wrangler.generated.toml`
 - `ENABLE_REAL_THINKING`: Enable real thinking mode
 - `ENABLE_FAKE_THINKING`: Enable fake thinking for testing
 - `STREAM_THINKING_AS_CONTENT`: Stream thinking as content
@@ -220,7 +222,7 @@ This Docker setup is designed for **local development only**. For production dep
    npm run deploy
    ```
 
-2. Set environment variables in Cloudflare Workers dashboard or wrangler.toml
+2. Set environment variables in Cloudflare Workers dashboard. Do NOT hardcode KV IDs in `wrangler.toml`; instead, provide `GEMINI_CLI_KV_ID` via CI secrets or environment.
 
 3. Create production KV namespaces:
    ```bash

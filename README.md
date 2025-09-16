@@ -108,12 +108,14 @@ wrangler kv namespace create "GEMINI_CLI_KV"
 ```
 
 Note the namespace ID returned.
-Update `wrangler.toml` with your KV namespace ID:
-```toml
-kv_namespaces = [
-  { binding = "GEMINI_CLI_KV", id = "your-kv-namespace-id" }
-]
+Do NOT hardcode it in `wrangler.toml`.
+
+Instead, add it to your local `.dev.vars` (this file is git-ignored):
+```ini
+GEMINI_CLI_KV_ID=<your-kv-namespace-id>
 ```
+
+For CI/CD (GitHub Actions), add a repository secret `GEMINI_CLI_KV_ID` with the same value. The build uses a generator to inject the ID into a temporary `.wrangler.generated.toml` at runtime, keeping the ID out of version control.
 
 ### Step 3: Environment Setup
 

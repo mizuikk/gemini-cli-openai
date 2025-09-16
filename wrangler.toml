@@ -6,7 +6,10 @@ compatibility_flags = ["nodejs_compat"]
 
 # --- KV Namespaces ---
 kv_namespaces = [
-  { binding = "GEMINI_CLI_KV", id = "15bec0713dfa49c6a18cc8a1bb5f0d4e" }
+  # Do not hardcode KV IDs to avoid leaking secrets in the repo.
+  # Run scripts/prepare-wrangler-config.mjs to inject IDs from environment
+  # and generate .wrangler.generated.toml for local dev and CI.
+  { binding = "GEMINI_CLI_KV" }
 ]
 
 # [vars]

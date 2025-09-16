@@ -55,4 +55,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # --port 8787 matches the EXPOSE and wrangler.toml [dev] port
 # --local disables proxying to Cloudflare's network, keeping everything local
 # --persist-to tells miniflare to use the specified path for local storage
-CMD ["wrangler", "dev", "--host", "0.0.0.0", "--port", "8787", "--local", "--persist-to", ".mf"]
+# Generate a temporary config (with KV IDs from env) before starting wrangler dev
+CMD ["sh", "-lc", "node scripts/prepare-wrangler-config.mjs && wrangler dev --config .wrangler.generated.toml --host 0.0.0.0 --port 8787 --local --persist-to .mf"]

@@ -11,6 +11,10 @@ GCP_SERVICE_ACCOUNT={"access_token":"ya29...","refresh_token":"1//...","scope":"
 # Optional: Google Cloud Project ID (auto-discovered if not set)
 # GEMINI_PROJECT_ID=your-project-id
 
+# Cloudflare KV namespace ID (LOCAL DEV ONLY; in CI, provide via repository secret)
+# Used by scripts/prepare-wrangler-config.mjs to generate .wrangler.generated.toml
+# GEMINI_CLI_KV_ID=your-kv-namespace-id
+
 # Optional: API key for authentication (if not set, API is public)
 # When set, clients must send: Authorization: Bearer <your-api-key>
 # Recommended format: sk-<random>
