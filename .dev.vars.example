@@ -49,6 +49,14 @@ GCP_SERVICE_ACCOUNT={"access_token":"ya29...","refresh_token":"1//...","scope":"
 #     A specialized mode for integrations expecting the DeepSeek Reasoner API format.
 #     Streams reasoning via `delta.reasoning_content`.
 
+#   - all: (ENABLE MULTIPLE ENDPOINT VARIANTS SIMULTANEOUSLY)
+#     Exposes additional prefixed endpoints that pin a specific mode per prefix:
+#       /field/v1    -> behaves like REASONING_OUTPUT_MODE=field
+#       /tagged/v1   -> behaves like REASONING_OUTPUT_MODE=tagged
+#       /hidden/v1   -> behaves like REASONING_OUTPUT_MODE=hidden
+#       /r1/v1       -> behaves like REASONING_OUTPUT_MODE=r1 (DeepSeek-compatible)
+#     The default /v1 remains available (uses environment-controlled mode).
+
 # Tagged v1 (non-stream) inline control
 # REASONING_TAGGED_NONSTREAM=omit     # omit | inline (default omit)
 

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { Env } from "./types";
-import { OpenAIRoute } from "./routes/openai";
+import { OpenAIRoute, createOpenAIRoute } from "./routes/openai";
 import { DebugRoute } from "./routes/debug";
 import { openAIApiKeyAuth } from "./middlewares/auth";
 import { loggingMiddleware } from "./middlewares/logging";
@@ -41,13 +41,25 @@ app.use("*", async (c, next) => {
 	await next();
 });
 
-// Apply OpenAI API key authentication middleware to all /v1 routes
+// Apply OpenAI API key authentication middleware to all OpenAI-compatible routes
 app.use("/v1/*", openAIApiKeyAuth);
+app.use("/field/v1/*", openAIApiKeyAuth);
+app.use("/tagged/v1/*", openAIApiKeyAuth);
+app.use("/hidden/v1/*", openAIApiKeyAuth);
+app.use("/r1/v1/*", openAIApiKeyAuth);
 
-// Setup route handlers
+// Setup OpenAI-compatible route handlers
+// Default OpenAI-compatible endpoints (use environment-controlled mode)
 app.route("/v1", OpenAIRoute);
-app.route("/v1/debug", DebugRoute);
 
+// Variant endpoints that pin a specific reasoning output mode
+app.route("/field/v1", createOpenAIRoute("field"));
+app.route("/tagged/v1", createOpenAIRoute("tagged"));
+app.route("/hidden/v1", createOpenAIRoute("hidden"));
+app.route("/r1/v1", createOpenAIRoute("r1"));
+
+// Debug endpoints
+app.route("/v1/debug", DebugRoute);
 // Add individual debug routes to main app for backward compatibility
 app.route("/v1", DebugRoute);
 
@@ -66,12 +78,19 @@ app.get("/", (c) => {
 		endpoints: {
 			chat_completions: "/v1/chat/completions",
 			models: "/v1/models",
+			variants: {
+				field: "/field/v1",
+				tagged: "/tagged/v1",
+				hidden: "/hidden/v1",
+				r1: "/r1/v1"
+			},
 			debug: {
 				cache: "/v1/debug/cache",
 				token_test: "/v1/token-test",
 				full_test: "/v1/test"
 			}
 		},
+		reasoning_output_mode: (c.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase(),
 		documentation: "https://github.com/gewoonjaap/gemini-cli-openai"
 	});
 });

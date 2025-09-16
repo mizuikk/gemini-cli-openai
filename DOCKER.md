@@ -136,6 +136,12 @@ curl -X POST http://localhost:8787/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -d '{"model":"gemini-2.0-flash-exp","messages":[{"role":"user","content":"Hello!"}]}'
 
+# If REASONING_OUTPUT_MODE=all, mode-specific variant prefixes are also available:
+curl http://localhost:8787/field/v1/models
+curl http://localhost:8787/tagged/v1/models
+curl http://localhost:8787/hidden/v1/models
+curl http://localhost:8787/r1/v1/models
+
 # Debug endpoints
 curl http://localhost:8787/v1/debug/cache
 curl http://localhost:8787/v1/token-test

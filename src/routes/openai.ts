@@ -10,10 +10,19 @@ import { createOpenAIStreamTransformer } from "../stream-transformer";
 /**
  * OpenAI-compatible API routes for models and chat completions.
  */
-export const OpenAIRoute = new Hono<{ Bindings: Env }>();
+/**
+ * Factory to create an OpenAI-compatible route with an optional
+ * per-endpoint reasoning output mode override.
+ *
+ * When `modeOverride` is provided (e.g. "field" | "tagged" | "hidden" | "r1"),
+ * this route will behave as if `REASONING_OUTPUT_MODE` equals that value for
+ * all requests under the mounted prefix, without mutating global env.
+ */
+export function createOpenAIRoute(modeOverride?: string) {
+    const route = new Hono<{ Bindings: Env }>();
 
 // List available models
-OpenAIRoute.get("/models", async (c) => {
+    route.get("/models", async (c) => {
 	const modelData = getAllModelIds().map((modelId) => ({
 		id: modelId,
 		object: "model",
@@ -25,10 +34,10 @@ OpenAIRoute.get("/models", async (c) => {
 		object: "list",
 		data: modelData
 	});
-});
+    });
 
 // Chat completions endpoint
-OpenAIRoute.post("/chat/completions", async (c) => {
+    route.post("/chat/completions", async (c) => {
 	try {
 		console.log("Chat completions request received");
 		const body = await c.req.json<ChatCompletionRequest>();
@@ -155,9 +164,20 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 			return true;
 		});
 
-		// Initialize services
-		const authManager = new AuthManager(c.env);
-		const geminiClient = new GeminiApiClient(c.env, authManager);
+
+		// Determine effective reasoning output mode for this endpoint
+		const envMode = (c.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
+		const overrideRaw = (modeOverride || "").toLowerCase();
+		// Normalize alias
+		const normalizedOverride = overrideRaw === "think-tags" ? "tagged" : overrideRaw;
+		const effectiveMode = (normalizedOverride || envMode);
+
+		// Initialize services with an env snapshot that applies the per-endpoint override (if any)
+		const envForRequest: Env = (normalizedOverride
+			? { ...(c.env as Env), REASONING_OUTPUT_MODE: effectiveMode }
+			: (c.env as Env));
+		const authManager = new AuthManager(envForRequest);
+		const geminiClient = new GeminiApiClient(envForRequest, authManager);
 
 		// Test authentication first
 		try {
@@ -173,7 +193,7 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 			// Streaming response
 			const { readable, writable } = new TransformStream();
 			const writer = writable.getWriter();
-			const openAITransformer = createOpenAIStreamTransformer(model, c.env.REASONING_OUTPUT_MODE || "tagged");
+			const openAITransformer = createOpenAIStreamTransformer(model, effectiveMode || "tagged");
 			const openAIStream = readable.pipeThrough(openAITransformer);
 
 			// Asynchronously pipe data from Gemini to transformer
@@ -243,7 +263,7 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 								role: "assistant",
 								content: completion.content,
 								// DeepSeek R1 mode: include reasoning_content in final message
-								...(c.env.REASONING_OUTPUT_MODE?.toLowerCase() === "r1" && completion.reasoning_content
+								...(effectiveMode === "r1" && completion.reasoning_content
 									? { reasoning_content: completion.reasoning_content }
 									: {}),
 								tool_calls: completion.tool_calls
@@ -263,7 +283,7 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 				}
 
 				// DeepSeek R1 compatibility: include completion_tokens_details at top-level
-				if ((c.env.REASONING_OUTPUT_MODE || "").toLowerCase() === "r1") {
+				if (effectiveMode === "r1") {
 					// Attach a minimal structure; exact counts are optional and model-dependent
 					(response as unknown as Record<string, unknown>).completion_tokens_details = {
 						reasoning_tokens: 0
@@ -283,4 +303,10 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 		console.error("Top-level error:", e);
 		return c.json({ error: errorMessage }, 500);
 	}
-});
+    });
+
+    return route;
+}
+
+// Backward-compatible default route (uses environment-controlled mode)
+export const OpenAIRoute = createOpenAIRoute();
