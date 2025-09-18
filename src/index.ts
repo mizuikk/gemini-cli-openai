@@ -43,7 +43,8 @@ app.use("*", async (c, next) => {
 
 // Apply OpenAI API key authentication middleware to all OpenAI-compatible routes
 app.use("/v1/*", openAIApiKeyAuth);
-app.use("/field/v1/*", openAIApiKeyAuth);
+// OpenAI mode path (LiteLLM/OpenAI-compatible reasoning fields)
+app.use("/openai/v1/*", openAIApiKeyAuth);
 app.use("/tagged/v1/*", openAIApiKeyAuth);
 app.use("/hidden/v1/*", openAIApiKeyAuth);
 app.use("/r1/v1/*", openAIApiKeyAuth);
@@ -53,7 +54,8 @@ app.use("/r1/v1/*", openAIApiKeyAuth);
 app.route("/v1", OpenAIRoute);
 
 // Variant endpoints that pin a specific reasoning output mode
-app.route("/field/v1", createOpenAIRoute("field"));
+// New canonical path for OpenAI/LiteLLM-style reasoning field
+app.route("/openai/v1", createOpenAIRoute("openai"));
 app.route("/tagged/v1", createOpenAIRoute("tagged"));
 app.route("/hidden/v1", createOpenAIRoute("hidden"));
 app.route("/r1/v1", createOpenAIRoute("r1"));
@@ -79,7 +81,7 @@ app.get("/", (c) => {
 			chat_completions: "/v1/chat/completions",
 			models: "/v1/models",
 			variants: {
-				field: "/field/v1",
+				openai: "/openai/v1",
 				tagged: "/tagged/v1",
 				hidden: "/hidden/v1",
 				r1: "/r1/v1"

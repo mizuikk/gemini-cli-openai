@@ -14,7 +14,7 @@ import { createOpenAIStreamTransformer } from "../stream-transformer";
  * Factory to create an OpenAI-compatible route with an optional
  * per-endpoint reasoning output mode override.
  *
- * When `modeOverride` is provided (e.g. "field" | "tagged" | "hidden" | "r1"),
+ * When `modeOverride` is provided (e.g. "openai" | "tagged" | "hidden" | "r1"),
  * this route will behave as if `REASONING_OUTPUT_MODE` equals that value for
  * all requests under the mounted prefix, without mutating global env.
  */
@@ -166,7 +166,7 @@ export function createOpenAIRoute(modeOverride?: string) {
 
 
 		// Determine effective reasoning output mode for this endpoint
-		const envMode = (c.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
+		let envMode = (c.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
 		const overrideRaw = (modeOverride || "").toLowerCase();
 		// Normalize alias
 		const normalizedOverride = overrideRaw === "think-tags" ? "tagged" : overrideRaw;
@@ -251,27 +251,27 @@ export function createOpenAIRoute(modeOverride?: string) {
 					...generationOptions
 				});
 
-				const response: ChatCompletionResponse = {
-					id: `chatcmpl-${crypto.randomUUID()}`,
-					object: "chat.completion",
-					created: Math.floor(Date.now() / 1000),
-					model: model,
-					choices: [
-						{
-							index: 0,
-							message: {
-								role: "assistant",
-								content: completion.content,
-								// DeepSeek R1 mode: include reasoning_content in final message
-								...(effectiveMode === "r1" && completion.reasoning_content
-									? { reasoning_content: completion.reasoning_content }
-									: {}),
-								tool_calls: completion.tool_calls
-							},
-							finish_reason: completion.tool_calls && completion.tool_calls.length > 0 ? "tool_calls" : "stop"
-						}
-					]
-				};
+                const response: ChatCompletionResponse = {
+                    id: `chatcmpl-${crypto.randomUUID()}`,
+                    object: "chat.completion",
+                    created: Math.floor(Date.now() / 1000),
+                    model: model,
+                    choices: [
+                        {
+                            index: 0,
+                            message: {
+                                role: "assistant",
+                                content: completion.content,
+                                // DeepSeek R1 & OpenAI field modes: include reasoning_content in final message
+                                ...( (effectiveMode === "r1" || effectiveMode === "openai") && completion.reasoning_content
+                                    ? { reasoning_content: completion.reasoning_content }
+                                    : {}),
+                                tool_calls: completion.tool_calls
+                            },
+                            finish_reason: completion.tool_calls && completion.tool_calls.length > 0 ? "tool_calls" : "stop"
+                        }
+                    ]
+                };
 
 				// Add usage information if available
 				if (completion.usage) {
@@ -282,13 +282,13 @@ export function createOpenAIRoute(modeOverride?: string) {
 					};
 				}
 
-				// DeepSeek R1 compatibility: include completion_tokens_details at top-level
-				if (effectiveMode === "r1") {
-					// Attach a minimal structure; exact counts are optional and model-dependent
-					(response as unknown as Record<string, unknown>).completion_tokens_details = {
-						reasoning_tokens: 0
-					};
-				}
+                // R1 & OpenAI (LiteLLM-compatible) modes: include completion_tokens_details at top-level
+                if (effectiveMode === "r1" || effectiveMode === "openai") {
+                    // Attach a minimal structure; exact counts are optional and model-dependent
+                    (response as unknown as Record<string, unknown>).completion_tokens_details = {
+                        reasoning_tokens: 0
+                    };
+                }
 
 				console.log("Non-streaming completion successful");
 				return c.json(response);

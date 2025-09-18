@@ -137,7 +137,7 @@ curl -X POST http://localhost:8787/v1/chat/completions \
   -d '{"model":"gemini-2.0-flash-exp","messages":[{"role":"user","content":"Hello!"}]}'
 
 # If REASONING_OUTPUT_MODE=all, mode-specific variant prefixes are also available:
-curl http://localhost:8787/field/v1/models
+curl http://localhost:8787/openai/v1/models   # canonical OpenAI/LiteLLM mode
 curl http://localhost:8787/tagged/v1/models
 curl http://localhost:8787/hidden/v1/models
 curl http://localhost:8787/r1/v1/models

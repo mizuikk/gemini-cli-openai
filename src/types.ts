@@ -16,11 +16,13 @@ export interface Env {
 	OPENAI_API_KEY?: string; // Optional API key for authentication
 	ENABLE_FAKE_THINKING?: string; // Optional flag to enable fake thinking output (set to "true" to enable)
 	ENABLE_REAL_THINKING?: string; // Optional flag to enable real Gemini thinking output (set to "true" to enable)
-	// Reasoning output presentation mode for downstream clients
-	// "tagged": inline <think>...</think> blocks in content (DeepSeek/Dify style)
-	// "field":  send reasoning in a separate field (delta.reasoning)
-	// "hidden": hide reasoning completely and only return final content
-	REASONING_OUTPUT_MODE?: string;
+    // Reasoning output presentation mode for downstream clients
+    // "tagged": inline <think>...</think> blocks in content (DeepSeek/Dify style)
+    // "openai": send reasoning in OpenAI/LiteLLM-compatible fields
+    //            - streaming: choices[].delta.reasoning_content
+    //            - non-stream: choices[].message.reasoning_content
+    // "hidden": hide reasoning completely and only return final content
+    REASONING_OUTPUT_MODE?: string;
 	// Tagged v1 (non-stream): control whether thinking is inlined into final message.content
 	// "omit" (default): exclude <think>...</think> from non-streaming responses
 	// "inline": prefix final content with a <think> block if available

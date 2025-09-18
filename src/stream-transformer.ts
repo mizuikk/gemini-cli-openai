@@ -102,6 +102,7 @@ export function createOpenAIStreamTransformer(
     const rawMode = (outputMode || "tagged").toLowerCase();
     const mode = rawMode === "think-tags" ? "tagged" : rawMode;
     const isR1 = mode === "r1"; // DeepSeek Reasoner-compatible stream
+    const isOpenAIField = mode === "openai"; // LiteLLM/OpenAI-compatible reasoning field naming
 
     return new TransformStream({
 		transform(chunk, controller) {
@@ -121,18 +122,18 @@ export function createOpenAIStreamTransformer(
                     break;
                 case "real_thinking":
                     if (typeof chunk.data === "string") {
-                        if (isR1) {
-                            // DeepSeek R1 spec: use delta.reasoning_content
+                        if (isR1 || isOpenAIField) {
+                            // R1 & OpenAI(LiteLLM) spec: use delta.reasoning_content
                             delta.reasoning_content = chunk.data;
                         } else {
-                            // Default custom field for non-R1 modes
+                            // Tagged/other custom field modes
                             delta.reasoning = chunk.data;
                         }
                     }
                     break;
                 case "reasoning":
                     if (isReasoningData(chunk.data)) {
-                        if (isR1) {
+                        if (isR1 || isOpenAIField) {
                             delta.reasoning_content = chunk.data.reasoning;
                         } else {
                             delta.reasoning = chunk.data.reasoning;
@@ -140,8 +141,8 @@ export function createOpenAIStreamTransformer(
                     }
                     break;
                 case "reasoning_end":
-                    // DeepSeek chunks do not send a reasoning_finished flag; omit in R1 mode
-                    if (!isR1 && isReasoningEndData(chunk.data)) {
+                    // Omit in R1 and OpenAI modes to match LiteLLM/OpenAI streaming shape
+                    if (!isR1 && !isOpenAIField && isReasoningEndData(chunk.data)) {
                         delta.reasoning_finished = chunk.data.finished;
                     }
                     break;

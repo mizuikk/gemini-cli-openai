@@ -27,14 +27,15 @@ GCP_SERVICE_ACCOUNT={"access_token":"ya29...","refresh_token":"1//...","scope":"
 
 # ENABLE_REAL_THINKING=true           # Enables Gemini's native reasoning output.
 
-# REASONING_OUTPUT_MODE=field         # Determines the format of the reasoning output.
+# REASONING_OUTPUT_MODE=openai        # Determines the format of the reasoning output.
 #
 # Available Modes:
 #
-#   - field: (RECOMMENDED FOR MOST CHAT CLIENTS)
-#     Sends reasoning in a separate `delta.reasoning` field in the SSE stream.
-#     The main `content` remains clean and free of special tags.
-#     Use this for standard OpenAI-compatible clients.
+#   - openai: (RECOMMENDED FOR MOST CHAT CLIENTS)
+#     OpenAI/LiteLLM-compatible reasoning fields.
+#     - Streaming:   `choices[].delta.reasoning_content`
+#     - Non-stream:  `choices[].message.reasoning_content`
+#     The main `content` stays clean (no <think> tags).
 #
 #   - tagged: (FOR SPECIALIZED UI INTEGRATIONS LIKE DIFY)
 #     Streams reasoning inline within the main `content`, wrapped in <think>...</think> blocks.
@@ -47,11 +48,12 @@ GCP_SERVICE_ACCOUNT={"access_token":"ya29...","refresh_token":"1//...","scope":"
 #
 #   - r1: (FOR DEEPSEEK REASONER COMPATIBILITY)
 #     A specialized mode for integrations expecting the DeepSeek Reasoner API format.
-#     Streams reasoning via `delta.reasoning_content`.
+#     Streams reasoning via `delta.reasoning_content` and returns
+#     top-level `completion_tokens_details.reasoning_tokens`.
 
 #   - all: (ENABLE MULTIPLE ENDPOINT VARIANTS SIMULTANEOUSLY)
 #     Exposes additional prefixed endpoints that pin a specific mode per prefix:
-#       /field/v1    -> behaves like REASONING_OUTPUT_MODE=field
+#       /openai/v1   -> behaves like REASONING_OUTPUT_MODE=openai
 #       /tagged/v1   -> behaves like REASONING_OUTPUT_MODE=tagged
 #       /hidden/v1   -> behaves like REASONING_OUTPUT_MODE=hidden
 #       /r1/v1       -> behaves like REASONING_OUTPUT_MODE=r1 (DeepSeek-compatible)

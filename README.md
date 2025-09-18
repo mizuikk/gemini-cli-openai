@@ -9,7 +9,7 @@ Transform Google's Gemini models into OpenAI-compatible endpoints using Cloudfla
 
 - 🔐 **Secure Authentication**: Uses your Google account's OAuth2 credentials. No API keys needed.
 - 🎯 **OpenAI-Compatible API**: A drop-in replacement for OpenAI's API, compatible with official SDKs and a wide range of tools.
-- 🧠 **Advanced Reasoning**: Full control over Gemini's "thinking" capabilities, with support for `field`, `tagged`, `hidden`, and DeepSeek-compatible `r1` output modes.
+- 🧠 **Advanced Reasoning**: Full control over Gemini's "thinking" capabilities, with support for `openai`, `tagged`, `hidden`, and DeepSeek-compatible `r1` output modes. (`field` is now a legacy alias of `openai`.)
 - 🛠️ **Full Tool Support**:
     - **OpenAI-Style Tool Calling**: Define and use your own custom functions.
     - **Native Gemini Tools**: Enable Google Search and other native tools directly.
@@ -145,7 +145,7 @@ Configure your worker by setting secrets in your `.dev.vars` file (for local dev
 | Variable                    | Default  | Description                                                                                                                                                             |
 | --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ENABLE_REAL_THINKING`      | `false`  | Set to `"true"` to enable Gemini's native reasoning capabilities.                                                                                                         |
-| `REASONING_OUTPUT_MODE`     | `tagged` | Defines reasoning format: `field` (recommended), `tagged` (for UIs like Dify), `hidden`, `r1` (DeepSeek-compatible), or `all` (exposes all modes via prefixed endpoints). |
+| `REASONING_OUTPUT_MODE`     | `tagged` | Defines reasoning format: `openai` (recommended), `tagged` (for UIs like Dify), `hidden`, `r1` (DeepSeek-compatible), or `all` (exposes all modes via prefixed endpoints). |
 | `REASONING_TAGGED_NONSTREAM`| `omit`   | For non-streaming `tagged` mode, set to `"inline"` to include `<think>` tags in the final response.                                                                       |
 | `ENABLE_FAKE_THINKING`      | `false`  | Set to `"true"` to generate synthetic reasoning text for testing.                                                                                                         |
 
@@ -235,19 +235,23 @@ You can control thinking via two request parameters in `extra_body`:
 
 The `REASONING_OUTPUT_MODE` environment variable controls how reasoning ("thinking") output is presented in the API response.
 
--   **`field` (Recommended)**: Reasoning is sent in a separate `delta.reasoning` field. This is the cleanest method for programmatic parsing.
+-   **`openai` (Recommended)**: LiteLLM/OpenAI-compatible reasoning fields.
+    -   **Streaming**: Reasoning is sent via `choices[].delta.reasoning_content`.
+    -   **Non-Streaming**: The final `message` object includes `reasoning_content` alongside `content`.
+    -   Legacy alias: `field` behaves identically to `openai`.
     -   **Streaming**: Reasoning chunks arrive as `{"reasoning": "..."}`. The final content arrives in a separate `{"content": "..."}` chunk.
-    -   **Non-Streaming**: The final response includes the complete reasoning text in a top-level `reasoning_content` field, separate from the `message.content`.-**`tagged` (Default)**: Reasoning is wrapped in `` tags and inlined with the content. This is useful for UIs like Dify that can render these tags.
+    -   **Non-Streaming**: The final response includes the complete reasoning text in `choices[].message.reasoning_content`, separate from `choices[].message.content`.
+    -   **`tagged` (Default)**: Reasoning is wrapped in `<think>...</think>` tags and inlined with the content (for UIs like Dify).
     -   **Streaming**: Chunks will be sent containing ``, followedby the actual message content.
     -   **Non-Streaming**: By default (`REASONING_TAGGED_NONSTREAM="omit"`), the `<think>` block is removed from the final output. Set to `"inline"` to keep it.
 
 -   **`hidden`**: Suppresses all reasoning output from the response. You will only receive the final content.
 
 -   **`r1`**: Formats the output to be compatible with DeepSeek Coder / Reasoner clients.
-    -   **Streaming**: Reasoning chunks are sent in a `{"reasoning_content": "..."}` field.
+    -   **Streaming**: Reasoning chunks are sent in `delta.reasoning_content`.
     -   **Non-Streaming**: The final `message` object contains both `content` and `reasoning_content` fields.
 
--   **`all`**: Exposes all modes on prefixed endpoints (e.g., `/field/v1`, `/tagged/v1`), allowing different clients to use their preferred format without changing worker configuration.
+-   **`all`**: Exposes all modes on prefixed endpoints (e.g., `/openai/v1`, `/tagged/v1`).
 
 ### Example: Real Thinking with Python
 
@@ -265,7 +269,7 @@ response = client.chat.completions.create(
 )
 
 for chunk in response:
-    # In 'field' mode, reasoning appears in a separate field
+    # In 'openai' mode (legacy 'field'), reasoning appears in `reasoning_content`
     if hasattr(chunk.choices[0].delta, 'reasoning') and chunk.choices[0].delta.reasoning:
         print(f"[Thinking] {chunk.choices[0].delta.reasoning}")
     if chunk.choices[0].delta.content:
