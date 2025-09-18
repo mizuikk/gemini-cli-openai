@@ -145,7 +145,7 @@ Configure your worker by setting secrets in your `.dev.vars` file (for local dev
 | Variable                    | Default  | Description                                                                                                                                                             |
 | --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ENABLE_REAL_THINKING`      | `false`  | Set to `"true"` to enable Gemini's native reasoning capabilities.                                                                                                         |
-| `REASONING_OUTPUT_MODE`     | `tagged` | Defines reasoning format: `openai` (recommended), `tagged` (for UIs like Dify), `hidden`, `r1` (DeepSeek-compatible), or `all` (exposes all modes via prefixed endpoints; default `/v1` behaves like `openai`). |
+| `REASONING_OUTPUT_MODE`     | `openai` | Defines reasoning format: `openai` (recommended), `tagged` (for UIs like Dify), `hidden`, `r1` (DeepSeek-compatible), or `all` (exposes all modes via prefixed endpoints; default `/v1` behaves like `openai`). |
 | `REASONING_TAGGED_NONSTREAM`| `omit`   | For non-streaming `tagged` mode, set to `"inline"` to include `<think>` tags in the final response.                                                                       |
 | `ENABLE_FAKE_THINKING`      | `false`  | Set to `"true"` to generate synthetic reasoning text for testing.                                                                                                         |
 
@@ -235,13 +235,11 @@ You can control thinking via two request parameters in `extra_body`:
 
 The `REASONING_OUTPUT_MODE` environment variable controls how reasoning ("thinking") output is presented in the API response.
 
--   **`openai` (Recommended)**: LiteLLM/OpenAI-compatible reasoning fields.
-    -   **Streaming**: Reasoning is sent via `choices[].delta.reasoning_content`.
-    -   **Non-Streaming**: The final `message` object includes `reasoning_content` alongside `content`.
+-   **`openai` (Default, Recommended)**: LiteLLM/OpenAI-compatible reasoning fields.
+    -   Streaming: reasoning is sent via `choices[].delta.reasoning_content` (chunks) and final `choices[].message.reasoning_content`.
+    -   Non-streaming: `choices[].message.reasoning_content` is returned alongside `content`.
     -   Legacy alias: `field` behaves identically to `openai`.
-    -   **Streaming**: Reasoning chunks arrive as `{"reasoning": "..."}`. The final content arrives in a separate `{"content": "..."}` chunk.
-    -   **Non-Streaming**: The final response includes the complete reasoning text in `choices[].message.reasoning_content`, separate from `choices[].message.content`.
-    -   **`tagged` (Default)**: Reasoning is wrapped in `<think>...</think>` tags and inlined with the content (for UIs like Dify).
+-   **`tagged`**: Reasoning is wrapped in `<think>...</think>` tags and inlined with the content (for UIs like Dify).
     -   **Streaming**: Chunks will be sent containing ``, followedby the actual message content.
     -   **Non-Streaming**: By default (`REASONING_TAGGED_NONSTREAM="omit"`), the `<think>` block is removed from the final output. Set to `"inline"` to keep it.
 

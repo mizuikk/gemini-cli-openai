@@ -323,8 +323,8 @@ export class GeminiApiClient {
 		const isThinkingModel = geminiCliModels[modelId]?.thinking || false;
 		const isRealThinkingEnabled = this.env.ENABLE_REAL_THINKING === "true";
 		const isFakeThinkingEnabled = this.env.ENABLE_FAKE_THINKING === "true";
-		// Normalize output mode aliases (prefer "tagged"; accept legacy "think-tags").
-		const __envModeRaw = (this.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
+		// Normalize output mode aliases (recognize legacy alias "think-tags" => "tagged").
+		const __envModeRaw = (this.env.REASONING_OUTPUT_MODE || "openai").toLowerCase();
 		const outputMode = __envModeRaw === "think-tags" ? "tagged" : __envModeRaw;
 		const hideThinkingByEnv = outputMode === "hidden";
 		const envWantsTagged = outputMode === "tagged";
@@ -808,7 +808,7 @@ export class GeminiApiClient {
 			const tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> = [];
 
 		// Determine Tagged v1 non-stream behavior
-		const __rawMode = (this.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
+		const __rawMode = (this.env.REASONING_OUTPUT_MODE || "openai").toLowerCase();
 		const __normalizedMode = __rawMode === "think-tags" ? "tagged" : __rawMode;
 			const __isR1Mode = __normalizedMode === "r1";
 			const __reqTaggedNonstream = this.extractStringParam(options as Record<string, unknown> | undefined, "tagged_nonstream", (v): v is "omit" | "inline" => v === "omit" || v === "inline");

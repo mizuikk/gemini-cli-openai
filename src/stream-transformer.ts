@@ -88,7 +88,7 @@ function isNativeToolResponse(data: unknown): data is NativeToolResponse {
  */
 export function createOpenAIStreamTransformer(
     model: string,
-    outputMode: string = "tagged"
+    outputMode: string = "openai"
 ): TransformStream<StreamChunk, Uint8Array> {
 	const chatID = `chatcmpl-${crypto.randomUUID()}`;
 	const creationTime = Math.floor(Date.now() / 1000);
@@ -98,8 +98,8 @@ export function createOpenAIStreamTransformer(
 	let toolCallName: string | null = null;
 	let usageData: UsageData | undefined;
 
-    // Normalize output mode aliases: prefer "tagged"; accept legacy "think-tags" as alias
-    const rawMode = (outputMode || "tagged").toLowerCase();
+    // Normalize output mode aliases: accept legacy "think-tags" as alias for "tagged"
+    const rawMode = (outputMode || "openai").toLowerCase();
     const mode = rawMode === "think-tags" ? "tagged" : rawMode;
     const isR1 = mode === "r1"; // DeepSeek Reasoner-compatible stream
     const isOpenAIField = mode === "openai"; // LiteLLM/OpenAI-compatible reasoning field naming

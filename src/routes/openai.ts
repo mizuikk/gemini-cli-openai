@@ -166,7 +166,7 @@ export function createOpenAIRoute(modeOverride?: string) {
 
 
 		// Determine effective reasoning output mode for this endpoint
-		let envMode = (c.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
+		let envMode = (c.env.REASONING_OUTPUT_MODE || "openai").toLowerCase();
 		const overrideRaw = (modeOverride || "").toLowerCase();
 		// Normalize aliases and handle 'all'
 		// - 'think-tags' is an alias of 'tagged'
@@ -199,7 +199,7 @@ export function createOpenAIRoute(modeOverride?: string) {
 			// Streaming response
 			const { readable, writable } = new TransformStream();
 			const writer = writable.getWriter();
-			const openAITransformer = createOpenAIStreamTransformer(model, effectiveMode || "tagged");
+			const openAITransformer = createOpenAIStreamTransformer(model, effectiveMode || "openai");
 			const openAIStream = readable.pipeThrough(openAITransformer);
 
 			// Asynchronously pipe data from Gemini to transformer

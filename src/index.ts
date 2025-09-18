@@ -92,7 +92,7 @@ app.get("/", (c) => {
 				full_test: "/v1/test"
 			}
 		},
-		reasoning_output_mode: (c.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase(),
+		reasoning_output_mode: (c.env.REASONING_OUTPUT_MODE || "openai").toLowerCase(),
 		documentation: "https://github.com/gewoonjaap/gemini-cli-openai"
 	});
 });

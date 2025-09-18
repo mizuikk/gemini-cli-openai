@@ -92,7 +92,7 @@ export interface ChatCompletionRequest {
     stream?: boolean;
     thinking_budget?: number; // Optional thinking token budget
     reasoning_effort?: EffortLevel; // Optional effort level for thinking
-    reasoning_format?: ReasoningFormat; // Dify-compatible: 'tagged' (default) or 'separated'
+    reasoning_format?: ReasoningFormat; // Dify-compatible: 'tagged' or 'separated' (defaults to env behavior)
     tools?: Tool[];
     tool_choice?: ToolChoice;
     // Support for common custom parameter locations
