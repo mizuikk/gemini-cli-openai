@@ -4,6 +4,8 @@ compatibility_date = "2024-09-23"
 
 compatibility_flags = ["nodejs_compat"]
 
+preview_urls = false
+
 ## KV namespaces are injected at build/dev time.
 ## Do not define kv_namespaces here to allow `wrangler kv namespace create` to run without validation errors.
 
