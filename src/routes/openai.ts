@@ -168,8 +168,14 @@ export function createOpenAIRoute(modeOverride?: string) {
 		// Determine effective reasoning output mode for this endpoint
 		let envMode = (c.env.REASONING_OUTPUT_MODE || "tagged").toLowerCase();
 		const overrideRaw = (modeOverride || "").toLowerCase();
-		// Normalize alias
+		// Normalize aliases and handle 'all'
+		// - 'think-tags' is an alias of 'tagged'
+		// - When REASONING_OUTPUT_MODE=all, default '/v1' should behave like 'openai'
 		const normalizedOverride = overrideRaw === "think-tags" ? "tagged" : overrideRaw;
+		if (!normalizedOverride) {
+			if (envMode === "think-tags") envMode = "tagged";
+			if (envMode === "all") envMode = "openai";
+		}
 		const effectiveMode = (normalizedOverride || envMode);
 
 		// Initialize services with an env snapshot that applies the per-endpoint override (if any)

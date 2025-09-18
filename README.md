@@ -145,7 +145,7 @@ Configure your worker by setting secrets in your `.dev.vars` file (for local dev
 | Variable                    | Default  | Description                                                                                                                                                             |
 | --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ENABLE_REAL_THINKING`      | `false`  | Set to `"true"` to enable Gemini's native reasoning capabilities.                                                                                                         |
-| `REASONING_OUTPUT_MODE`     | `tagged` | Defines reasoning format: `openai` (recommended), `tagged` (for UIs like Dify), `hidden`, `r1` (DeepSeek-compatible), or `all` (exposes all modes via prefixed endpoints). |
+| `REASONING_OUTPUT_MODE`     | `tagged` | Defines reasoning format: `openai` (recommended), `tagged` (for UIs like Dify), `hidden`, `r1` (DeepSeek-compatible), or `all` (exposes all modes via prefixed endpoints; default `/v1` behaves like `openai`). |
 | `REASONING_TAGGED_NONSTREAM`| `omit`   | For non-streaming `tagged` mode, set to `"inline"` to include `<think>` tags in the final response.                                                                       |
 | `ENABLE_FAKE_THINKING`      | `false`  | Set to `"true"` to generate synthetic reasoning text for testing.                                                                                                         |
 
@@ -251,7 +251,7 @@ The `REASONING_OUTPUT_MODE` environment variable controls how reasoning ("thinki
     -   **Streaming**: Reasoning chunks are sent in `delta.reasoning_content`.
     -   **Non-Streaming**: The final `message` object contains both `content` and `reasoning_content` fields.
 
--   **`all`**: Exposes all modes on prefixed endpoints (e.g., `/openai/v1`, `/tagged/v1`).
+-   **`all`**: Exposes all modes on prefixed endpoints (e.g., `/openai/v1`, `/tagged/v1`). When set, the default `/v1` behaves like `openai` mode.
 
 ### Example: Real Thinking with Python
 

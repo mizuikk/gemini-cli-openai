@@ -57,7 +57,8 @@ GCP_SERVICE_ACCOUNT={"access_token":"ya29...","refresh_token":"1//...","scope":"
 #       /tagged/v1   -> behaves like REASONING_OUTPUT_MODE=tagged
 #       /hidden/v1   -> behaves like REASONING_OUTPUT_MODE=hidden
 #       /r1/v1       -> behaves like REASONING_OUTPUT_MODE=r1 (DeepSeek-compatible)
-#     The default /v1 remains available (uses environment-controlled mode).
+#     Additionally, when REASONING_OUTPUT_MODE=all, the default /v1 behaves like
+#     REASONING_OUTPUT_MODE=openai.
 
 # Tagged v1 (non-stream) inline control
 # REASONING_TAGGED_NONSTREAM=omit     # omit | inline (default omit)
